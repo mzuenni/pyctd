@@ -12,4 +12,7 @@ jobs:
       - uses: actions/setup-python@v3
         with:
           python-version: '3.10'
+      # Make sure that `git describe` (used by Hatch to dynamically generate the version) knows the Git history, but no data about trees/blobs is needed.
+      - run: git fetch --prune --unshallow --filter=tree:0
+      - run: python3 -m pip install --editable .
       - run: bash test/checktestdata_tests.sh
