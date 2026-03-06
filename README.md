@@ -44,3 +44,7 @@ pyctd validator.ctd --convert [name] [-d | --debug]
 
 > [!TIP]
 > The generated validator might not be easy to read, cosider adding `-d` to include the original code as comments.
+
+## Extensions
+
+This checktesdata implementation supports the `--constraints_file` argument and can be used with [BAPCtools](https://github.com/RagnarGrootKoerkamp/BAPCtools) to check the constraints of a problem.
