@@ -392,7 +392,9 @@ def UNIQUE(arg, *args):
 def INARRAY(value, array):
 	assert isinstance(value, _ValueType)
 	assert isinstance(array, VarType)
-	return array.data == value or Boolean(array.value_count[value] > 0)
+	if array.data is not None and array.data == value:
+		return Boolean(True)
+	return Boolean(array.value_count[value] > 0)
 
 def STRLEN(arg):
 	assert_type("STRLEN", arg, String)
