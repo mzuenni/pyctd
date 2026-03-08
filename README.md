@@ -12,7 +12,7 @@ This is a Python 3.10 compatible reimplementation of the checktestdata program.
 
 ## Grammar specification
 
-The language specification can be found in the 
+The language specification can be found in the
 [domjudge Checktestdata repository](https://github.com/DOMjudge/checktestdata/blob/main/doc/format-spec.md).
 
 ## Installation
