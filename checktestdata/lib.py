@@ -448,6 +448,9 @@ def EOF():
 def INT(min, max, constraint=None):
     assert_type("INT", min, Number)
     assert_type("INT", max, Number)
+    # checktestdata is strict with the parameter type
+    if not min.is_integer() or not max.is_integer():
+        raise TypeError("INT expected integer but got float")
     text, line, column = reader.pop_token(INTEGER_REGEX)
     if text is None:
         got = reader.peek_until_space()

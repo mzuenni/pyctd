@@ -99,20 +99,15 @@ class Operator:
 
 class Assignment:
     def __init__(self, lhs, rhs):
-        self.lhs = lhs
-        self.rhs = rhs
+        self.lhs = lhs if isinstance(lhs, list) else [lhs]
+        self.rhs = rhs if isinstance(lhs, list) else [rhs]
+        assert(len(self.lhs) == len(self.rhs))
 
     def __str__(self):
-        return f"{self.lhs} = {self.rhs}"
-
-
-class Set:
-    def __init__(self, args):
-        assert all(isinstance(a, Assignment) for a in args)
-        self.args = args
-
-    def __str__(self):
-        return "; ".join(map(str, self.args))
+        return "; ".join(f"{lhs} = {rhs}" for lhs, rhs in zip(self.lhs, self.rhs))
+        #lhs = ", ".join(map(str, self.lhs))
+        #rhs = ", ".join(map(str, self.rhs))
+        #return f"{lhs} = {rhs}"
 
 
 class Expression:
@@ -284,7 +279,10 @@ class Parser:
         args, variable = self._parse_signature(token)
         if token.text() == "SET":
             assert variable is None
-            command = Set(args)
+            assert all(isinstance(a, Assignment) for a in args)
+            lhs = sum([a.lhs for a in args], [])
+            rhs = sum([a.rhs for a in args], [])
+            command = Assignment(lhs, rhs)
         else:
             command = Command(token, args)
             if variable is not None:
