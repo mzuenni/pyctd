@@ -40,6 +40,9 @@ ignore = [
     "UP045", # Allow Optional
 ]
 
+[tool.ruff]
+line-length = 200
+
 [tool.ruff.lint.isort]
 # Case-insensitive ordering in `from ? import X, y, Z`
 order-by-type = false

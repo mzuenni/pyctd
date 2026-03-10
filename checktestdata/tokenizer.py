@@ -8,9 +8,9 @@ class TokenType(Enum):
     FLOAT = auto()
     STRING = auto()
     VARNAME = auto()
-    COMPARE = auto()
     NOT = auto()
     LOGICAL = auto()
+    COMPARE = auto()
     MATH = auto()
     ASSIGN = auto()
     COMMA = auto()
@@ -82,23 +82,19 @@ class TokenStream:
     def peek(self):
         return self.next
 
-    def has(self, *, type=None, text=None):
+    def has(self, *, type=None):
         if self.empty():
             return False
         cur = self.peek()
         if type is not None and cur.type != type:
             return False
-        if text is not None and cur.text() != text:
-            return False
         return True
 
-    def pop(self, *, expected_type=None, expected_text=None):
+    def pop(self, *, expected_type=None):
         res, self.next = self.next, next(self.generator, None)
         if res is None:
             raise EOFException("unexpected end of file")
         if expected_type is not None and res.type != expected_type:
-            raise UnexpectedTokenException(res)
-        if expected_text is not None and res.text() != expected_text:
             raise UnexpectedTokenException(res)
         self.buffered.append(res)
         return res
@@ -145,19 +141,7 @@ def tokenize(raw):
                 return TokenType.TEST
             case "STRLEN":
                 return TokenType.FUNCTION
-            case (
-                "SPACE"
-                | "NEWLINE"
-                | "EOF"
-                | "INT"
-                | "FLOAT"
-                | "FLOATP"
-                | "STRING"
-                | "REGEX"
-                | "ASSERT"
-                | "SET"
-                | "UNSET"
-            ):
+            case "SPACE" | "NEWLINE" | "EOF" | "INT" | "FLOAT" | "FLOATP" | "STRING" | "REGEX" | "ASSERT" | "SET" | "UNSET":
                 return TokenType.COMMAND
             case "REP" | "REPI" | "WHILE" | "WHILEI" | "IF":
                 return TokenType.CONTROLFLOW
@@ -181,11 +165,7 @@ def tokenize(raw):
             if base_type == "_KEYWORD":
                 type = keyword_type(text)
             elif base_type == "_NUMBER":
-                type = (
-                    TokenType.INTEGER
-                    if integer_token.fullmatch(text)
-                    else TokenType.FLOAT
-                )
+                type = TokenType.INTEGER if integer_token.fullmatch(text) else TokenType.FLOAT
             else:
                 type = TokenType[base_type]
 

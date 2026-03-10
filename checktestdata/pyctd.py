@@ -4,7 +4,7 @@ import traceback
 from pathlib import Path
 
 from checktestdata.lib import ValidationError
-from checktestdata.parser import parse
+from checktestdata.parser import parse, ParserException
 from checktestdata.tokenizer import tokenize
 
 
@@ -60,6 +60,7 @@ def main():
         debug("Generating tokens")
         tokens = tokenize(raw_ctd)
         debug("Parsing tokens")
+        sys.setrecursionlimit(10**7)
         parser = parse(tokens, debug_comments=config.debug)
         debug("Converting to python code")
         if config.convert is not None:
@@ -92,6 +93,9 @@ def main():
                         break
                 sys.exit(2)
         debug("Done")
+    except ParserException as e:
+        print(f"{e.token.line}:{e.token.column}", e, file=sys.stderr)
+        sys.exit(2)
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(2)

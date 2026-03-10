@@ -14,8 +14,39 @@ if hasattr(sys, "set_int_max_str_digits"):
 class ValidationError(Exception):
     pass
 
+class Boolean:
+    __slots__ = ("value",)
 
-class _ValueType(ABC):
+    @staticmethod
+    def _check_boolean_type(lhs, rhs):
+        if Boolean != rhs.__class__:
+            raise TypeError(f"cannot combine Boolean and {rhs.__class__.__name__}")
+
+    def __init__(self, value):
+        assert isinstance(value, bool)
+        self.value = value
+
+    def __repr__(self):
+        return f"Boolean({repr(self.value)})"
+
+    def __str__(self):
+        return f"Boolean({self.value})"
+
+    def __bool__(self):
+        return self.value
+
+    def __invert__(self):
+        return Boolean(not self.value)
+
+    def __and__(self, other):
+        Boolean._check_boolean_type(self, other)
+        return Boolean(self.value and other.value)
+
+    def __or__(self, other):
+        Boolean._check_boolean_type(self, other)
+        return Boolean(self.value or other.value)
+
+class Value(ABC):
     __slots__ = ("value",)
 
     def __init__(self, value):
@@ -27,81 +58,46 @@ class _ValueType(ABC):
     def __str__(self):
         return f"{self.__class__.__name__}({self.value})"
 
-    def __bool__(self):
-        raise TypeError(f"object of type '{self.__class__.__name__}' has no bool()")
-
     def __invert__(self):
         raise TypeError(f"bad operand type for unary !: '{self.__class__.__name__}'")
 
-
-class Boolean(_ValueType):
-    __slots__ = ()
-
-    @staticmethod
-    def _check_combine_type(lhs, rhs):
-        if lhs.__class__ != rhs.__class__:
-            raise TypeError(
-                f"cannot combine {lhs.__class__.__name__} and {rhs.__class__.__name__}"
-            )
-
-    def __init__(self, value):
-        assert isinstance(value, bool)
-        super().__init__(value)
-
-    def __bool__(self):
-        return self.value
-
-    def __invert__(self):
-        return Boolean(not self.value)
-
-    def __and__(self, other):
-        Boolean._check_combine_type(self, other)
-        return Boolean(self.value and other.value)
-
-    def __or__(self, other):
-        Boolean._check_combine_type(self, other)
-        return Boolean(self.value or other.value)
-
-
-class _CompareableValue(_ValueType, ABC):
-    __slots__ = ()
+    def __pow__(self, other):
+        raise TypeError(f"unsupported operand type(s) for ^: '{self.__class__.__name__}' and '{other.__class__.__name__}'")
 
     @staticmethod
     def _check_compare_type(lhs, rhs):
         if lhs.__class__ != rhs.__class__:
-            raise TypeError(
-                f"cannot compare {lhs.__class__.__name__} and {rhs.__class__.__name__}"
-            )
+            raise TypeError(f"cannot compare {lhs.__class__.__name__} and {rhs.__class__.__name__}")
 
     def __hash__(self):
         return hash(self.value)
 
     def __eq__(self, other):
-        _CompareableValue._check_compare_type(self, other)
+        Value._check_compare_type(self, other)
         return Boolean(self.value == other.value)
 
     def __ne__(self, other):
-        _CompareableValue._check_compare_type(self, other)
+        Value._check_compare_type(self, other)
         return Boolean(self.value != other.value)
 
     def __lt__(self, other):
-        _CompareableValue._check_compare_type(self, other)
+        Value._check_compare_type(self, other)
         return Boolean(self.value < other.value)
 
     def __le__(self, other):
-        _CompareableValue._check_compare_type(self, other)
+        Value._check_compare_type(self, other)
         return Boolean(self.value <= other.value)
 
     def __ge__(self, other):
-        _CompareableValue._check_compare_type(self, other)
+        Value._check_compare_type(self, other)
         return Boolean(self.value >= other.value)
 
     def __gt__(self, other):
-        _CompareableValue._check_compare_type(self, other)
+        Value._check_compare_type(self, other)
         return Boolean(self.value > other.value)
 
 
-class String(_CompareableValue):
+class String(Value):
     __slots__ = ()
 
     def __init__(self, value):
@@ -109,15 +105,13 @@ class String(_CompareableValue):
         super().__init__(value)
 
 
-class Number(_CompareableValue):
+class Number(Value):
     __slots__ = ()
 
     @staticmethod
     def _check_combine_type(lhs, rhs):
         if lhs.__class__ != rhs.__class__:
-            raise TypeError(
-                f"cannot combine {lhs.__class__.__name__} and {rhs.__class__.__name__}"
-            )
+            raise TypeError(f"cannot combine {lhs.__class__.__name__} and {rhs.__class__.__name__}")
 
     def __init__(self, value):
         assert isinstance(value, (int, Fraction))
@@ -175,11 +169,7 @@ class Number(_CompareableValue):
             return Number(self.value / other.value)
 
     def __pow__(self, other):
-        if (
-            not other.is_integer()
-            or other.value < 0
-            or other.value.bit_length() > sys.maxsize.bit_length() + 1
-        ):
+        if not other.is_integer() or other.value < 0 or other.value.bit_length() > sys.maxsize.bit_length() + 1:
             raise TypeError("exponent must be an unsigned long")
         return Number(self.value**other.value)
 
@@ -212,9 +202,7 @@ class VarType:
             return self.entries[key]
 
     def __setitem__(self, key, value):
-        assert isinstance(value, _ValueType), self.name
-        if isinstance(value, Boolean):
-        	raise TypeError(f"value for {self.name} must not be {value.value}")
+        assert isinstance(value, Value), self.name
         if key is None:
             self.data = value
         else:
@@ -249,9 +237,7 @@ FLOAT_PARTS = re.compile(r"-?([0-9]*)(?:\.([0-9]*))?(?:[eE](.*))?")
 class FLOAT_OPTION(Enum):
     ANY = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))?")
     FIXED = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?")
-    SCIENTIFIC = re.compile(
-        r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))"
-    )
+    SCIENTIFIC = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))")
 
     def msg(self):
         return "float" if self == FLOAT_OPTION.ANY else f"{self.name.lower()} float"
@@ -327,9 +313,7 @@ class Constraints:
     def log(self, name, value, min_value, max_value):
         if self.file is None or name is None:
             return
-        a, b, c, d, e, f = self.entries.get(
-            name, (False, False, min_value, max_value, value, value)
-        )
+        a, b, c, d, e, f = self.entries.get(name, (False, False, min_value, max_value, value, value))
         a |= value == min_value
         b |= value == max_value
         c = min(c, value)
@@ -418,13 +402,9 @@ def UNIQUE(arg, *args):
     for other in args:
         assert isinstance(other, VarType)
         if (arg.data is None) != (other.data is None):
-            raise ValidationError(
-                f"{arg.name} and {other.name} must have the same keys for UNIQUE"
-            )
+            raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE")
         if arg.entries.keys() != other.entries.keys():
-            raise ValidationError(
-                f"{arg.name} and {other.name} must have the same keys for UNIQUE"
-            )
+            raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE")
 
     def make_entry(key):
         return (arg[key], *(other[key] for other in args))
@@ -438,7 +418,7 @@ def UNIQUE(arg, *args):
 
 
 def INARRAY(value, array):
-    assert isinstance(value, _ValueType)
+    assert isinstance(value, Value)
     assert isinstance(array, VarType)
     if array.data is not None and array.data == value:
         return Boolean(True)
@@ -471,14 +451,10 @@ def INT(min, max, constraint=None):
     text, line, column = reader.pop_token(INTEGER_REGEX)
     if text is None:
         got = reader.peek_until_space()
-        raise ValidationError(
-            f"{line}:{column} expected an integer but got {msg_text(got)}"
-        )
+        raise ValidationError(f"{line}:{column} expected an integer but got {msg_text(got)}")
     value = int(text)
     if value < min.value or value > max.value:
-        raise ValidationError(
-            f"{line}:{column} integer {text} outside of range [{min.value}, {max.value}]"
-        )
+        raise ValidationError(f"{line}:{column} integer {text} outside of range [{min.value}, {max.value}]")
     constraints.log(constraint, value, min.value, max.value)
     return Number(value)
 
@@ -490,14 +466,10 @@ def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
     text, line, column = reader.pop_token(option.value)
     if text is None:
         got = reader.peek_until_space()
-        raise ValidationError(
-            f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}"
-        )
+        raise ValidationError(f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}")
     value = Fraction(text)
     if value < min.value or value > max.value:
-        raise ValidationError(
-            f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]"
-        )
+        raise ValidationError(f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]")
     if text.startswith("-") and value == 0:
         raise ValidationError(f"{line}:{column} float {text} should have no sign")
     constraints.log(constraint, value, min.value, max.value)
@@ -517,25 +489,17 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
     text, line, column = reader.pop_token(option.value)
     if text is None:
         got = reader.peek_until_space()
-        raise ValidationError(
-            f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}"
-        )
+        raise ValidationError(f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}")
     leading, decimals, exponent = FLOAT_PARTS.fullmatch(text).groups()
     decimals = 0 if decimals is None else len(decimals)
     has_exp = exponent is not None
     if decimals < mindecimals.value or decimals > maxdecimals.value:
-        raise ValidationError(
-            f"{line}:{column} float decimals outside of range [{mindecimals.value}, {maxdecimals.value}]"
-        )
+        raise ValidationError(f"{line}:{column} float decimals outside of range [{mindecimals.value}, {maxdecimals.value}]")
     if has_exp and (len(leading) != 1 or leading == "0"):
-        raise ValidationError(
-            f"{line}:{column} scientific float should have exactly one non-zero before the decimal dot"
-        )
+        raise ValidationError(f"{line}:{column} scientific float should have exactly one non-zero before the decimal dot")
     value = Fraction(text)
     if value < min.value or value > max.value:
-        raise ValidationError(
-            f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]"
-        )
+        raise ValidationError(f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]")
     if text.startswith("-") and value == 0:
         raise ValidationError(f"{line}:{column} float {text} should have no sign")
     constraints.log(constraint, value, min.value, max.value)

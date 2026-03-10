@@ -1,10 +1,12 @@
 import fractions
 import re
+from collections import defaultdict
+from enum import auto, Enum
 from itertools import count
 from pathlib import Path
 
 import checktestdata.lib
-from checktestdata.lib import Number, String, VarType
+from checktestdata.lib import Boolean, Number, String, Value, VarType
 from checktestdata.tokenizer import Token, TokenType
 
 
@@ -252,9 +254,7 @@ class Parser:
                 if optional:
                     recurse(arg)
                 elif arg == TokenType.OPTION:
-                    parsed_args.append(
-                        f"FLOAT_OPTION.{self.tokens.pop(expected_type=TokenType.OPTION).text()}"
-                    )
+                    parsed_args.append(f"FLOAT_OPTION.{self.tokens.pop(expected_type=TokenType.OPTION).text()}")
                 elif arg in ["_variable", "_constraint_variable"]:
                     assert variable is None
                     variable = self._variable()
@@ -332,63 +332,79 @@ class Parser:
             case TokenType.FUNCTION:
                 return self._function()
             case _:
-                raise ParserException(
-                    f"expected expression, but got '{token.text()}'", token
-                )
+                raise ParserException(f"expected expression, but got '{token.text()}'", token)
 
-    def _any_expr(self):
+    OPERATOR_SIGNATURES = (
+        (TokenType.MATH, Value),
+        (TokenType.COMPARE, Value),
+        (TokenType.LOGICAL, Boolean),
+    )
+
+    def _parse_expr(self, root_precedence, expected):
         parts = []
 
-        def recurse():
-            while True:
-                nonlocal parts
-                while any(
-                    (
-                        self.tokens.has(type=TokenType.MATH, text="-"),
-                        self.tokens.has(type=TokenType.NOT),
-                    )
-                ):
-                    parts.append(Operator(self.tokens.pop()))
-                token = self.tokens.peek()
-                match token.type:
-                    case TokenType.OPENPAR:
-                        parts.append(self.tokens.pop())
-                        recurse()
-                        parts.append(self.tokens.pop(expected_type=TokenType.CLOSEPAR))
-                    case TokenType.STRING | TokenType.INTEGER | TokenType.FLOAT:
-                        constant = self.add_constant(self.tokens.pop())
-                        parts.append(constant)
-                    case TokenType.VARNAME:
-                        parts.append(self._variable())
-                    case TokenType.FUNCTION:
-                        parts.append(self._function())
-                    case TokenType.TEST:
-                        parts.append(self._test())
-                    case _:
-                        raise ParserException(
-                            f"expected expression, but got '{token.text()}'", token
-                        )
-                if any(
-                    (
-                        self.tokens.has(type=TokenType.MATH),
-                        self.tokens.has(type=TokenType.COMPARE),
-                        self.tokens.has(type=TokenType.LOGICAL),
-                    )
-                ):
-                    parts.append(Operator(self.tokens.pop()))
-                else:
-                    return
+        def recurse(precedence):
+            nonlocal parts
 
-        recurse()
+            token = self.tokens.peek()
+            match token.type:
+                case TokenType.OPENPAR:
+                    parts.append(self.tokens.pop())
+                    lhs = recurse(root_precedence)
+                    parts.append(self.tokens.pop(expected_type=TokenType.CLOSEPAR))
+                case TokenType.MATH if token.text() == "-":
+                    parts.append(Operator(self.tokens.pop()))
+                    lhs = recurse(TokenType.MATH.value)
+                    if lhs != Value:
+                        raise ParserException(f"bad operand type for unary -: '{lhs.__name__}'")
+                case TokenType.NOT if expected == Boolean:
+                    parts.append(Operator(self.tokens.pop()))
+                    lhs = recurse(TokenType.LOGICAL.value)
+                    if lhs != Boolean:
+                        raise ParserException(f"bad operand type for unary !: '{lhs.__name__}'")
+                case TokenType.STRING | TokenType.INTEGER | TokenType.FLOAT:
+                    lhs = Value
+                    constant = self.add_constant(self.tokens.pop())
+                    parts.append(constant)
+                case TokenType.VARNAME:
+                    lhs = Value
+                    parts.append(self._variable())
+                case TokenType.FUNCTION:
+                    lhs = Value
+                    parts.append(self._function())
+                case TokenType.TEST if expected == Boolean:
+                    lhs = Boolean
+                    parts.append(self._test())
+                case _:
+                    raise ParserException(f"invalid token in expression: '{token.text()}'", token)
+
+            while True:
+                operator = self.tokens.peek()
+                if operator.type not in (TokenType.LOGICAL, TokenType.COMPARE, TokenType.MATH):
+                    break
+                if operator.type.value < precedence:
+                    break
+                if (operator.type, lhs) not in Parser.OPERATOR_SIGNATURES:
+                    raise TypeError(f"unsupported operand type(s) for {operator}: '{lhs.__name__}' and '?'")
+                parts.append(Operator(self.tokens.pop()))
+                rhs = recurse(operator.type.value + 1)
+                if (operator.type, rhs) not in Parser.OPERATOR_SIGNATURES:
+                    raise TypeError(f"unsupported operand type(s) for {operator}: '?' and '{rhs.__name__}'")
+                if operator.type == TokenType.COMPARE:
+                    lhs = Boolean
+
+            return lhs
+
+        type = recurse(root_precedence)
+        if type != expected:
+            raise ParserException(f"invalid expression starting with: '{parts[0].text()}'", parts[0])
         return Expression(parts)
 
     def _expr(self):
-        # actual type checking is done at runtime
-        return self._any_expr()
+        return self._parse_expr(TokenType.MATH.value, Value)
 
     def _test_expr(self):
-        # actual type checking is done at runtime
-        return self._any_expr()
+        return self._parse_expr(TokenType.LOGICAL.value, Boolean)
 
     def _parse_block(self, indent):
         token = self.tokens.pop(expected_type=TokenType.CONTROLFLOW)
@@ -404,20 +420,18 @@ class Parser:
                 loop_var = "_"
                 local = self.get_new_local()
                 """
-				local = args[0]
-				For _ in range(local):
-					variable = Number(_) #optional:
-					#optional:
-					if _ > 0:
-						args[1]
-				variable = Number(local) #optional
-				"""
+                local = args[0]
+                For _ in range(local):
+                    variable = Number(_) #optional:
+                    #optional:
+                    if _ > 0:
+                        args[1]
+                variable = Number(local) #optional
+                """
                 self.add_line(indent, Assignment(local, args[0]))
                 self.add_line(indent, For(f"range({local})", loop_var))
                 if variable is not None:
-                    self.add_line(
-                        indent + 1, Assignment(variable, Command("Number", [loop_var]))
-                    )
+                    self.add_line(indent + 1, Assignment(variable, Command("Number", [loop_var])))
                 if len(args) > 1:
                     self.add_line(indent + 1, If(f"{loop_var} > 0"))
                     self.add_line(indent + 2, args[1])
@@ -427,19 +441,17 @@ class Parser:
             case "WHILE" | "WHILEI":
                 loop_var = "_"
                 """
-				For _ in count(0):
-					variable = Number(_) #optional
-					if not (args[0]):
-						break
-					#optional:
-					if _ > 0:
-						args[1]
-				"""
+                For _ in count(0):
+                    variable = Number(_) #optional
+                    if not (args[0]):
+                        break
+                    #optional:
+                    if _ > 0:
+                        args[1]
+                """
                 self.add_line(indent, For("count(0)", loop_var))
                 if variable is not None:
-                    self.add_line(
-                        indent + 1, Assignment(variable, Command("Number", [loop_var]))
-                    )
+                    self.add_line(indent + 1, Assignment(variable, Command("Number", [loop_var])))
                 self.add_line(indent + 1, If(Expression(["not ", "(", args[0], ")"])))
                 self.add_line(indent + 2, "break")
                 if len(args) > 1:
@@ -476,9 +488,7 @@ class Parser:
                     count += 1
                     self._parse_command(indent)
                 case _:
-                    raise ParserException(
-                        f"expected command, but got '{token.text()}'", token
-                    )
+                    raise ParserException(f"expected command, but got '{token.text()}'", token)
 
     def parse(self):
         if self.lines is None:
