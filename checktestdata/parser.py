@@ -4,6 +4,7 @@ from collections import defaultdict
 from enum import auto, Enum
 from itertools import count
 from pathlib import Path
+from types import FunctionType
 
 import checktestdata.lib
 from checktestdata.lib import Boolean, Number, String, Value, VarType
@@ -514,10 +515,10 @@ class Parser:
             generated.append("#" * 80)
             generated.append("# constants and variables")
             generated.append("#" * 80)
-            for name, value in self.constants.items():
-                generated.append(f"{name} = {repr(value)}")
-            for name, value in self.variables.items():
-                generated.append(f"{name} = VarType({repr(value.name)})")
+            print(str(self.python_globals()).replace(", ", ",\n"))
+            for name, value in self.python_globals().items():
+                if isinstance(value, (VarType, Value)):
+                    generated.append(f"{name} = {repr(value)}")
             generated.append("")
 
         generated.append("#" * 80)
@@ -531,8 +532,9 @@ class Parser:
         return "\n".join(generated) + "\n"
 
     def python_globals(self):
+        lib_functions = {name: f for name, f in checktestdata.lib.__dict__.items() if not name.startswith("_")}
         return {
-            **checktestdata.lib.__dict__,
+            **lib_functions,
             "count": count,
             **self.constants,
             **self.variables,

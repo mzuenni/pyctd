@@ -186,6 +186,9 @@ class VarType:
         self.entries = {}
         self.value_count = Counter()
 
+    def __repr__(self):
+        return f"VarType({repr(self.name)})"
+
     def reset(self):
         self.data = None
         self.entries = {}
