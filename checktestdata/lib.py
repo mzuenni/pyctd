@@ -196,10 +196,14 @@ class VarType:
 
     def __getitem__(self, key):
         if key is None:
+            if self.entries:
+                raise TypeError(f"{self.name} is an array, not a value")
             if self.data is None:
                 raise TypeError(f"{self.name} is not assigned")
             return self.data
         else:
+            if self.data is not None:
+                raise TypeError(f"{self.name} is a value not an array")
             if key not in self.entries:
                 raise TypeError(f"missing key in {self.name}")
             return self.entries[key]
@@ -207,8 +211,12 @@ class VarType:
     def __setitem__(self, key, value):
         assert isinstance(value, Value), self.name
         if key is None:
+            if self.entries:
+                raise TypeError(f"{self.name} is an array, not a value")
             self.data = value
         else:
+            if self.data is not None:
+                raise TypeError(f"{self.name} is a value not an array")
             for key_part in key:
                 # Checktestdata seems to enforce integers here
                 if not isinstance(key_part, Number) or not key_part.is_integer():
@@ -222,6 +230,11 @@ class VarType:
 def assert_type(method, arg, t):
     if not isinstance(arg, t):
         raise TypeError(f"{method} cannot be invoked with {arg.__class__.__name__}")
+
+def assert_array(method, arg):
+    assert isinstance(arg, VarType)
+    if arg.data is not None:
+        raise TypeError(f"{method} must be invoked with an array variable")
 
 
 def msg_text(text):
@@ -401,30 +414,22 @@ def ISEOF():
 
 
 def UNIQUE(arg, *args):
-    assert isinstance(arg, VarType)
+    assert_array("UNIQUE", arg)
     for other in args:
-        assert isinstance(other, VarType)
-        if (arg.data is None) != (other.data is None):
-            raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE")
+        assert_array("UNIQUE", other)
         if arg.entries.keys() != other.entries.keys():
             raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE")
 
     def make_entry(key):
         return (arg[key], *(other[key] for other in args))
 
-    expected = len(arg.entries)
-    unique = {make_entry(key) for key in arg.entries.keys()}
-    if arg.data is not None:
-        expected += 1
-        unique.add((arg.data, *(other.data for other in args)))
-    return Boolean(len(unique) == expected)
+    unique = {make_entry(key) for key in arg.entries}
+    return Boolean(len(unique) == len(arg.entries))
 
 
 def INARRAY(value, array):
     assert isinstance(value, Value)
-    assert isinstance(array, VarType)
-    if array.data is not None and array.data == value:
-        return Boolean(True)
+    assert_array("INARRAY", array)
     return Boolean(array.value_count[value] > 0)
 
 
