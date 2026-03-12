@@ -29,10 +29,9 @@ def parse_string(token):
             return ""
         if text in '\\"':
             return text
-        if text in "ntrb":
-            return f"\\{text}".encode().decode("unicode_escape")
-        # pythons unicode_escape decode warns for values > 3FF
-        return chr(int(text, 8))
+        if len(text) == 3 and text[0] in "4567":
+            raise ParserException(f"Bad escape sequence '\\{text}'", token)
+        return f"\\{text}".encode().decode("unicode_escape")
 
     text = ESCAPE_REGEX.sub(replace, token.text())
     assert len(text) >= 2
