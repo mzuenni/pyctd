@@ -101,8 +101,11 @@ class String(Value):
     __slots__ = ()
 
     def __init__(self, value):
-        assert isinstance(value, str)
+        assert isinstance(value, bytes)
         super().__init__(value)
+
+    def __str__(self):
+        return f"String({self.value.decode(errors='replace')})"
 
 
 class Number(Value):
@@ -226,21 +229,21 @@ def assert_type(method, arg, t):
 
 def msg_text(text):
     special = {
-        " ": "<SPACE>",
-        "\n": "<NEWLINE>",
-        "": "<EOF>",
+        b" ": "<SPACE>",
+        b"\n": "<NEWLINE>",
+        b"": "<EOF>",
     }
-    return special.get(text, text)
+    return special.get(text, text.decode(errors="replace"))
 
 
-INTEGER_REGEX = re.compile(r"0|-?[1-9][0-9]*")
-FLOAT_PARTS = re.compile(r"-?([0-9]*)(?:\.([0-9]*))?(?:[eE](.*))?")
+INTEGER_REGEX = re.compile(rb"0|-?[1-9][0-9]*")
+FLOAT_PARTS = re.compile(rb"-?([0-9]*)(?:\.([0-9]*))?(?:[eE](.*))?")
 
 
 class FLOAT_OPTION(Enum):
-    ANY = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))?")
-    FIXED = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?")
-    SCIENTIFIC = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))")
+    ANY = re.compile(rb"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))?")
+    FIXED = re.compile(rb"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?")
+    SCIENTIFIC = re.compile(rb"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))")
 
     def msg(self):
         return "float" if self == FLOAT_OPTION.ANY else f"{self.name.lower()} float"
@@ -252,13 +255,13 @@ class _Reader:
         self.pos = 0
         self.line = 1
         self.column = 1
-        self.space_tokenizer = re.compile(r"[\s]|[^\s]*", re.DOTALL | re.MULTILINE)
+        self.space_tokenizer = re.compile(rb"[\s]|[^\s]*", re.DOTALL | re.MULTILINE)
 
     def _advance(self, text):
         self.pos += len(text)
-        newline = text.find("\n")
+        newline = text.find(b"\n")
         if newline >= 0:
-            self.line += text.count("\n")
+            self.line += text.count(b"\n")
             self.column = len(text) - newline
         else:
             self.column += len(text)
@@ -280,7 +283,8 @@ class _Reader:
         match = regex.match(self.raw, self.pos)
         if not match:
             got = self.peek_until_space()
-            msg = f"{self.line}:{self.column} got: {msg_text(got)}, but expected '{regex.pattern}'"
+            expected = regex.pattern.decode(errors="replace")
+            msg = f"{self.line}:{self.column} got: {msg_text(got)}, but expected '{expected}'"
             raise ValidationError(msg)
         text = match.group()
         self._advance(text)
@@ -298,7 +302,7 @@ class _Reader:
             text = match.group()
             line, column = self.line, self.column
             self.pos += len(text)
-            if text == "\n":
+            if text == b"\n":
                 self.line += 1
                 self.column = 1
             else:
@@ -375,7 +379,7 @@ def init_lib():
         args, _ = parser.parse_known_args()
 
     constraints = Constraints(args.constraints_file)
-    raw = sys.stdin.buffer.read().decode("latin1")
+    raw = sys.stdin.buffer.read()
     reader = _Reader(raw)
 
 
@@ -434,11 +438,11 @@ def STRLEN(arg):
 
 
 def SPACE():
-    reader.pop_string(" ")
+    reader.pop_string(b" ")
 
 
 def NEWLINE():
-    reader.pop_string("\n")
+    reader.pop_string(b"\n")
 
 
 def EOF():
@@ -454,13 +458,13 @@ def INT(min, max, constraint=None):
     # checktestdata is strict with the parameter type
     if not min.is_integer() or not max.is_integer():
         raise TypeError("INT expected integer but got float")
-    text, line, column = reader.pop_token(INTEGER_REGEX)
-    if text is None:
+    raw, line, column = reader.pop_token(INTEGER_REGEX)
+    if raw is None:
         got = reader.peek_until_space()
         raise ValidationError(f"{line}:{column} expected an integer but got {msg_text(got)}")
-    value = int(text)
+    value = int(raw)
     if value < min.value or value > max.value:
-        raise ValidationError(f"{line}:{column} integer {text} outside of range [{min.value}, {max.value}]")
+        raise ValidationError(f"{line}:{column} integer {raw.decode()} outside of range [{min.value}, {max.value}]")
     constraints.log(constraint, value, min.value, max.value)
     return Number(value)
 
@@ -469,10 +473,11 @@ def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
     assert isinstance(option, FLOAT_OPTION)
     assert_type("FLOAT", min, Number)
     assert_type("FLOAT", max, Number)
-    text, line, column = reader.pop_token(option.value)
-    if text is None:
+    raw, line, column = reader.pop_token(option.value)
+    if raw is None:
         got = reader.peek_until_space()
         raise ValidationError(f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}")
+    text = raw.decode()
     value = Fraction(text)
     if value < min.value or value > max.value:
         raise ValidationError(f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]")
@@ -492,17 +497,18 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
         raise TypeError("FLOATP(mindecimals) must be a non-negative integer")
     if not isinstance(maxdecimals.value, int) or maxdecimals.value < 0:
         raise TypeError("FLOATP(maxdecimals) must be a non-negative integer")
-    text, line, column = reader.pop_token(option.value)
-    if text is None:
+    raw, line, column = reader.pop_token(option.value)
+    if raw is None:
         got = reader.peek_until_space()
         raise ValidationError(f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}")
-    leading, decimals, exponent = FLOAT_PARTS.fullmatch(text).groups()
+    leading, decimals, exponent = FLOAT_PARTS.fullmatch(raw).groups()
     decimals = 0 if decimals is None else len(decimals)
     has_exp = exponent is not None
     if decimals < mindecimals.value or decimals > maxdecimals.value:
         raise ValidationError(f"{line}:{column} float decimals outside of range [{mindecimals.value}, {maxdecimals.value}]")
-    if has_exp and (len(leading) != 1 or leading == "0"):
+    if has_exp and (len(leading) != 1 or leading == b"0"):
         raise ValidationError(f"{line}:{column} scientific float should have exactly one non-zero before the decimal dot")
+    text = raw.decode()
     value = Fraction(text)
     if value < min.value or value > max.value:
         raise ValidationError(f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]")

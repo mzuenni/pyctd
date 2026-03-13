@@ -17,7 +17,7 @@ class ParserException(Exception):
         self.token = token
 
 
-ESCAPE_REGEX = re.compile(r'\\([0-7]{1,3}|[\n\\"ntrb])', re.DOTALL | re.MULTILINE)
+ESCAPE_REGEX = re.compile(rb'\\([0-7]{1,3}|[\n\\"ntrb])', re.DOTALL | re.MULTILINE)
 
 
 def parse_string(token):
@@ -25,18 +25,28 @@ def parse_string(token):
 
     def replace(match):
         text = match.groups()[0]
-        if text == "\n":
-            return ""
-        if text in '\\"':
-            return text
-        if len(text) == 3 and text[0] in "4567":
-            raise ParserException(f"Bad escape sequence '\\{text}'", token)
-        return f"\\{text}".encode().decode("unicode_escape")
+        match text:
+            case b"\n":
+                return b""
+            case b"\\" | b'"':
+                return text
+            case b"n":
+                return b"\n"
+            case b"t":
+                return b"\t"
+            case b"r":
+                return b"\r"
+            case b"b":
+                return b"\b"
+            case _ if len(text) <= 2 or text[0] in b"0123":
+                return bytes((int(text, 8),))
+            case _:
+                raise ParserException(f"Bad escape sequence '\\{text.decode()}'", token)
 
-    text = ESCAPE_REGEX.sub(replace, token.text())
+    text = ESCAPE_REGEX.sub(replace, token.bytes())
     assert len(text) >= 2
-    assert text[0] == '"'
-    assert text[-1] == '"'
+    assert text[0] == ord('"')
+    assert text[-1] == ord('"')
     return text[1:-1]
 
 
@@ -47,9 +57,9 @@ class Comment:
     def __str__(self):
         def escape_newline(token):
             if isinstance(token, Token) and token.type == TokenType.STRING:
-                raw = f'"{parse_string(token)}"'
+                raw = f'"{parse_string(token).decode(errors="replace")}"'
             else:
-                raw = str(token)
+                raw = token.text()
             return raw.replace("\\", "\\\\").replace("\n", "\\n")
 
         comment = "".join(escape_newline(t) for t in self.tokens)
@@ -164,12 +174,7 @@ class Parser:
         if tokens:
             self.debug_info.append((len(self.lines) + 1, tokens))
             if self.debug_comments:
-                self.lines.append(
-                    (
-                        indent,
-                        Comment([f"{tokens[0].line}:{tokens[0].column} ", *tokens]),
-                    )
-                )
+                self.lines.append(indent, Comment([f"{tokens[0].line}:{tokens[0].column} ", *tokens]))
 
     def add_line(self, indent, line):
         self._add_debug_info(indent)
@@ -179,7 +184,7 @@ class Parser:
         value = None
         match token.type:
             case TokenType.INTEGER:
-                value = Number(int(token.text()))
+                value = Number(int(token.bytes()))
             case TokenType.FLOAT:
                 value = Number(fractions.Fraction(token.text()))
             case TokenType.STRING:

@@ -56,7 +56,7 @@ def main():
 
     try:
         debug(f"Reading: {config.ctd_file}")
-        raw_ctd = config.ctd_file.read_bytes().decode("latin1")
+        raw_ctd = config.ctd_file.read_bytes()
         debug("Generating tokens")
         tokens = tokenize(raw_ctd)
         debug("Parsing tokens")
@@ -77,11 +77,9 @@ def main():
                 debug("Running compiled code")
                 exec(compiled, python_globals)
             except ValidationError as e:
-                traceback.print_exc()
                 print(e, file=sys.stderr)
                 sys.exit(1)
             except Exception as e:
-                traceback.print_exc()
                 print(e, file=sys.stderr)
                 for frame in traceback.extract_tb(e.__traceback__):
                     if frame.filename == str(raw_ctd):
@@ -93,10 +91,8 @@ def main():
                 sys.exit(2)
         debug("Done")
     except ParserException as e:
-        traceback.print_exc()
         print(f"{e.token.line}:{e.token.column}", e, file=sys.stderr)
         sys.exit(2)
     except Exception as e:
-        traceback.print_exc()
         print(e, file=sys.stderr)
         sys.exit(2)

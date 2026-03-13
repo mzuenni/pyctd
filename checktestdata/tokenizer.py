@@ -32,18 +32,20 @@ class TokenType(Enum):
 
 @dataclass
 class Token:
-    raw: str
+    raw: bytes
     start: int
     end: int
     line: int
     column: int
     type: TokenType
 
-    def text(self):
+    def bytes(self):
         return self.raw[self.start : self.end]
 
+    def text(self):
+        return self.bytes().decode(errors="replace")
+
     def __str__(self):
-        # return f"{self.line}:{self.column}:{self.type}{{{self.text()}}}"
         return self.text()
 
     def __repr__(self):
@@ -111,43 +113,43 @@ def tokenize(raw):
     # - all keywords
     # - integers and floats
     token_regex = {
-        "_NUMBER": r"(?:(?:[0-9]*\.[0-9]+|[0-9]+\.|[0-9]+)(?:[eE][+-]?[0-9]+)?)|(?:0|[1-9][0-9]*)",
-        "STRING": r'"(?:[^"\\]|\\.)*"',
-        "_KEYWORD": r"[A-Z]+",
-        "VARNAME": r"[a-z][a-z0-9]*",
-        "COMPARE": r"<=?|>=?|==|!=",
-        "NOT": r"!",
-        "LOGICAL": r"&&|\|\|",
-        "MATH": r"[+*/%^-]",
-        "ASSIGN": r"=",
-        "COMMA": r",",
-        "SPACE": r"\s",
-        "OPENBRACKET": r"\[",
-        "CLOSEBRACKET": r"\]",
-        "OPENPAR": r"\(",
-        "CLOSEPAR": r"\)",
-        "COMMENT": r"#[^\n]*",
-        "UNKNOWN": r".",
+        "_NUMBER": rb"(?:(?:[0-9]*\.[0-9]+|[0-9]+\.|[0-9]+)(?:[eE][+-]?[0-9]+)?)|(?:0|[1-9][0-9]*)",
+        "STRING": rb'"(?:[^"\\]|\\.)*"',
+        "_KEYWORD": rb"[A-Z]+",
+        "VARNAME": rb"[a-z][a-z0-9]*",
+        "COMPARE": rb"<=?|>=?|==|!=",
+        "NOT": rb"!",
+        "LOGICAL": rb"&&|\|\|",
+        "MATH": rb"[+*/%^-]",
+        "ASSIGN": rb"=",
+        "COMMA": rb",",
+        "SPACE": rb"\s",
+        "OPENBRACKET": rb"\[",
+        "CLOSEBRACKET": rb"\]",
+        "OPENPAR": rb"\(",
+        "CLOSEPAR": rb"\)",
+        "COMMENT": rb"#[^\n]*",
+        "UNKNOWN": rb".",
     }
-    combined = "|".join(f"(?P<{name}>{regex})" for name, regex in token_regex.items())
+    combined = b"|".join(b"(?P<%s>%s)" % (name.encode(), regex) for name, regex in token_regex.items())
     base_tokenizer = re.compile(combined, re.DOTALL | re.MULTILINE)
-    integer_token = re.compile(r"0|[1-9][0-9]*")
+    integer_token = re.compile(rb"0|[1-9][0-9]*")
 
     def keyword_type(keyword):
         match keyword:
-            case "FIXED" | "SCIENTIFIC":
+            case b"FIXED" | b"SCIENTIFIC":
                 return TokenType.OPTION
-            case "MATCH" | "ISEOF" | "UNIQUE" | "INARRAY":
+            case b"MATCH" | b"ISEOF" | b"UNIQUE" | b"INARRAY":
                 return TokenType.TEST
-            case "STRLEN":
+            case b"STRLEN":
                 return TokenType.FUNCTION
-            case "SPACE" | "NEWLINE" | "EOF" | "INT" | "FLOAT" | "FLOATP" | "STRING" | "REGEX" | "ASSERT" | "SET" | "UNSET":
+            case b"SPACE" | b"NEWLINE" | b"EOF" | b"INT" | b"FLOAT" | b"FLOATP" | b"STRING" | b"REGEX" | b"ASSERT" | b"SET" | b"UNSET":
                 return TokenType.COMMAND
-            case "REP" | "REPI" | "WHILE" | "WHILEI" | "IF":
+            case b"REP" | b"REPI" | b"WHILE" | b"WHILEI" | b"IF":
                 return TokenType.CONTROLFLOW
-            case "ELSE":
+            case b"ELSE":
                 return TokenType.ELSE
-            case "END":
+            case b"END":
                 return TokenType.END
             case _:
                 return TokenType.UNKNOWN
@@ -174,9 +176,9 @@ def tokenize(raw):
             if type == TokenType.UNKNOWN:
                 raise UnknownTokenException(token)
 
-            newline = text.find("\n")
+            newline = text.find(b"\n")
             if newline >= 0:
-                line += text.count("\n")
+                line += text.count(b"\n")
                 column = len(text) - newline
             else:
                 column += len(text)
