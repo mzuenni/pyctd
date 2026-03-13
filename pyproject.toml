@@ -14,7 +14,9 @@ classifiers = [
 ]
 license = "GPL-3.0"
 license-files = ["LICENSE"]
-dependencies = []
+dependencies = [
+    "regex>=2016.01.01",
+]
 
 [project.scripts]
 pyctd = "checktestdata.pyctd:main"
