@@ -514,7 +514,6 @@ class Parser:
             generated.append("#" * 80)
             generated.append("# constants and variables")
             generated.append("#" * 80)
-            print(str(self.python_globals()).replace(", ", ",\n"))
             for name, value in self.python_globals().items():
                 if isinstance(value, (VarType, Value)):
                     generated.append(f"{name} = {repr(value)}")

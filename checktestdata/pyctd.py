@@ -85,10 +85,7 @@ def main():
                     if frame.filename == str(raw_ctd):
                         line = parser.guess_line(python_code, frame.lineno)
                         if line:
-                            print(
-                                f"Source {line[0].line}:{line[0].column}",
-                                file=sys.stderr,
-                            )
+                            print(f"Source {line[0].line}:{line[0].column}", file=sys.stderr)
                             print("".join(map(str, line)))
                         break
                 sys.exit(2)
