@@ -1,0 +1,1 @@
+REGEX("p|ps") REGEX("s") NEWLINE

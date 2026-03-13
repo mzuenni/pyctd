@@ -1,5 +1,6 @@
 import argparse
-import re
+#import re
+import regex as re
 import sys
 from abc import ABC
 from collections import Counter
@@ -291,7 +292,7 @@ class _Reader:
         return text
 
     def pop_pattern(self, pattern):
-        regex = re.compile(pattern, re.DOTALL | re.MULTILINE)
+        regex = re.compile(pattern, re.DOTALL | re.MULTILINE | re.POSIX)
         return self.pop_regex(regex)
 
     def pop_token(self, regex):
