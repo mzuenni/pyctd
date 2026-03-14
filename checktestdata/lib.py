@@ -232,6 +232,9 @@ def msg_text(text):
         b" ": "<SPACE>",
         b"\n": "<NEWLINE>",
         b"": "<EOF>",
+        b"\t": "<TAB>",
+        b"\r": "<CARRIAGE_RETURN>",
+        b"\b": "<BACKSPACE>",
     }
     return special.get(text, text.decode(errors="replace"))
 
@@ -276,6 +279,8 @@ class _Reader:
         if not self.raw.startswith(expected, self.pos):
             got = self.raw[self.pos : self.pos + len(expected)]
             msg = f"{self.line}:{self.column} got: {msg_text(got)}, but expected {msg_text(expected)}"
+            if expected == b"\n" and got == b"\r":
+                msg += ' (use explicit STRING("\\r\\n") for windows newlines)'
             raise ValidationError(msg)
         self._advance(expected)
 
