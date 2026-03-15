@@ -59,7 +59,7 @@ class Comment:
             if isinstance(token, Token) and token.type == TokenType.STRING:
                 raw = f'"{parse_string(token).decode(errors="replace")}"'
             else:
-                raw = token.text()
+                raw = str(token)
             return raw.replace("\\", "\\\\").replace("\n", "\\n")
 
         comment = "".join(escape_newline(t) for t in self.tokens)
@@ -174,7 +174,7 @@ class Parser:
         if tokens:
             self.debug_info.append((len(self.lines) + 1, tokens))
             if self.debug_comments:
-                self.lines.append(indent, Comment([f"{tokens[0].line}:{tokens[0].column} ", *tokens]))
+                self.lines.append((indent, Comment([f"{tokens[0].line}:{tokens[0].column} ", *tokens])))
 
     def add_line(self, indent, line):
         self._add_debug_info(indent)
