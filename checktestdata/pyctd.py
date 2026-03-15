@@ -13,14 +13,15 @@ def parse_args():
         description="Checktestdata tool written in Python."
     )
     parser.add_argument(
-        "--debug",
         "-d",
+        "--debug",
         action="store_true",
         help="Print debug messages",
     )
     parser.add_argument(
-        "--convert",
         "-c",
+        "--convert",
+        metavar="FILE",
         nargs="?",
         const=True,
         default=None,
@@ -29,15 +30,22 @@ def parse_args():
     )
     parser.add_argument(
         "--constraints_file",
+        metavar="FILE",
         default=None,
         required=False,
         help="The file to write constraints to file to use.",
     )
     parser.add_argument(
-        "program", type=Path, help="The .ctd checker source file"
+        "program",
+        metavar="PROGRAM",
+        type=Path,
+        help="The .ctd checker source file",
     )
     parser.add_argument(
-        "testdata", nargs="?", help="If given, the input file to check, or `-` for stdin"
+        "testdata",
+        metavar="TESTDATA",
+        nargs="?",
+        help="If given, the input file to check, or `-` for stdin",
     )
 
     args = parser.parse_args()
@@ -48,7 +56,7 @@ def parse_args():
             parser.error("invalid arguments, cannot combine `--convert` and `testdata`")
     if args.convert is True:
         args.convert = args.program.with_suffix(".py")
-
+    print(args.convert)
     return args
 
 
