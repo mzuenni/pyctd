@@ -397,6 +397,7 @@ def init_lib():
 
 def finalize_lib():
     constraints.write()
+    print("testdata ok!")
     if standalone:
         sys.exit(42)
 

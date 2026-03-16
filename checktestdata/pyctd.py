@@ -56,7 +56,6 @@ def parse_args():
             parser.error("invalid arguments, cannot combine `--convert` and `testdata`")
     if args.convert is True:
         args.convert = args.program.with_suffix(".py")
-    print(args.convert)
     return args
 
 
