@@ -80,6 +80,7 @@ def main():
     try:
         debug(f"Reading: {config.program}")
         raw_ctd = config.program.read_bytes()
+        file_name = str(config.program)
         debug("Generating tokens")
         tokens = tokenize(raw_ctd)
         debug("Parsing tokens")
@@ -95,24 +96,20 @@ def main():
             python_code = parser.python_code()
             python_globals = parser.python_globals()
             debug("Compiling python code")
-            compiled = compile(python_code, str(raw_ctd), "exec")
+            compiled = compile(python_code, file_name, "exec")
             try:
                 debug("Running compiled code")
                 sys.argv = standalone_args(config)
                 exec(compiled, python_globals)
-            except ValidationError as e:
-                print(e, file=sys.stderr)
-                sys.exit(1)
             except Exception as e:
                 print(e, file=sys.stderr)
                 for frame in traceback.extract_tb(e.__traceback__):
-                    if frame.filename == str(raw_ctd):
+                    if frame.filename == file_name:
                         line = parser.guess_line(python_code, frame.lineno)
                         if line:
-                            print(f"Source {line[0].line}:{line[0].column}", file=sys.stderr)
-                            print("".join(map(str, line)))
+                            print(f"Source {line[0].line}:{line[0].column}", "".join(map(str, line)), file=sys.stderr)
                         break
-                sys.exit(2)
+                sys.exit(1 if isinstance(e, ValidationError) else 2)
         debug("Done")
     except ParserException as e:
         print(f"{e.token.line}:{e.token.column}", e, file=sys.stderr)

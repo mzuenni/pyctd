@@ -10,9 +10,87 @@ from pathlib import Path
 if hasattr(sys, "set_int_max_str_digits"):
     sys.set_int_max_str_digits(0)
 
+def decode_unsafe(raw):
+    out = []
+    for byte in raw:
+        if byte == 0x0A:
+            # newline
+            out.append("\u21A9")
+        elif byte == 0x20:
+            # space
+            out.append("\u2423")
+        elif 0x00 <= byte <= 0x1F:
+            # control characters
+            out.append(chr(0x2400 + byte))
+        elif byte == 0x7F:
+            # del
+            out.append("\u2421")
+        else:
+            # latin1 encoding
+            out.append(chr(byte))
+            # error decoding
+            # out.append("\ufffd")
+    return "".join(out)
+
+ELLIPSIS = "[...]"
+
+def crop(text, limit=25):
+    if len(text) > limit + len(ELLIPSIS):
+        return text[:limit - len(ELLIPSIS)] + ELLIPSIS
+    return text
+
+def format_token(raw):
+    special = {
+        b" ": "<SPACE>",
+        b"\n": "<NEWLINE>",
+        b"": "<EOF>",
+    }
+    return special.get(raw, f"`{crop(decode_unsafe(raw))}`")
+
+class InputToken:
+    def __init__(self, raw, line, column, length):
+        self.raw = raw
+        self.line = line
+        self.column = column
+        self.length = length
+
+    def format(self):
+        lines = self.raw.split(b"\n")
+        line = lines[self.line - 1]
+        if self.line < len(lines):
+            line += b"\n"
+        offset = self.column - 1
+        pref = line[:offset]
+        part = line[offset:offset + self.length]            
+
+        line = decode_unsafe(line)
+        pref = decode_unsafe(pref)
+        part = decode_unsafe(part)
+
+        highlight = "".join((" " * len(pref), "^", "~" * max(0, len(part) - 1)))
+        if self.line < len(lines) and len(highlight) > len(line):
+            highlight = highlight[:len(line)]
+
+        if len(part) > 75 + len(ELLIPSIS):
+            line = line[:len(pref) + 75] + ELLIPSIS
+            highlight = highlight[:len(pref) + 75]
+        if len(line) > 75 + len(ELLIPSIS) and len(pref) > 20 + len(ELLIPSIS):
+            line = ELLIPSIS + line[len(pref) - 20:]
+            highlight = highlight[len(pref) - 20 - len(ELLIPSIS):]
+        if len(line) > 75 + len(ELLIPSIS):
+            line = line[:75] + ELLIPSIS
+            highlight = highlight[:75]
+
+        return f"{line}\n{highlight}"
 
 class ValidationError(Exception):
-    pass
+    def __init__(self, msg, token=None):
+        self.msg = msg
+        self.token = token
+        if token:
+            super().__init__(f"{token.line}:{token.column} {msg}\n{token.format()}")
+        else:
+            super().__init__(msg)
 
 class Boolean:
     __slots__ = ("value",)
@@ -227,18 +305,6 @@ def assert_type(method, arg, t):
         raise TypeError(f"{method} cannot be invoked with {arg.__class__.__name__}")
 
 
-def msg_text(text):
-    special = {
-        b" ": "<SPACE>",
-        b"\n": "<NEWLINE>",
-        b"": "<EOF>",
-        b"\t": "<TAB>",
-        b"\r": "<CARRIAGE_RETURN>",
-        b"\b": "<BACKSPACE>",
-    }
-    return special.get(text, text.decode(errors="replace"))
-
-
 INTEGER_REGEX = re.compile(rb"0|-?[1-9][0-9]*")
 FLOAT_PARTS = re.compile(rb"-?([0-9]*)(?:\.([0-9]*))?(?:[eE](.*))?")
 
@@ -278,19 +344,20 @@ class _Reader:
     def pop_string(self, expected):
         if not self.raw.startswith(expected, self.pos):
             got = self.raw[self.pos : self.pos + len(expected)]
-            msg = f"{self.line}:{self.column} got: {msg_text(got)}, but expected {msg_text(expected)}"
+            msg = f"got: {format_token(got)}, but expected {format_token(expected)}"
             if expected == b"\n" and got == b"\r":
                 msg += ' (use explicit STRING("\\r\\n") for windows newlines)'
-            raise ValidationError(msg)
+            token = InputToken(self.raw, self.line, self.column, len(got))
+            raise ValidationError(msg, token)
         self._advance(expected)
 
     def pop_regex(self, regex):
         match = regex.match(self.raw, self.pos)
         if not match:
             got = self.peek_until_space()
-            expected = regex.pattern.decode(errors="replace")
-            msg = f"{self.line}:{self.column} got: {msg_text(got)}, but expected '{expected}'"
-            raise ValidationError(msg)
+            msg = f"got: {format_token(got)}, but expected '{format_token(expected)}'"
+            token = InputToken(self.raw, self.line, self.column, len(got))
+            raise ValidationError(msg, token)
         text = match.group()
         self._advance(text)
         return text
@@ -461,8 +528,9 @@ def NEWLINE():
 def EOF():
     got = reader.peek_char()
     if got:
-        msg = f"{reader.line}:{reader.column} got: {msg_text(got)}, but expected {msg_text(b'')}"
-        raise ValidationError(msg)
+        msg = f"got: {format_token(got)}, but expected {format_token(b'')}"
+        token = InputToken(reader.raw, reader.line, reader.column, 1)
+        raise ValidationError(msg, token)
 
 
 def INT(min, max, constraint=None):
@@ -474,10 +542,12 @@ def INT(min, max, constraint=None):
     raw, line, column = reader.pop_token(INTEGER_REGEX)
     if raw is None:
         got = reader.peek_until_space()
-        raise ValidationError(f"{line}:{column} expected an integer but got {msg_text(got)}")
+        token = InputToken(reader.raw, line, column, len(got))
+        raise ValidationError(f"expected an integer but got {format_token(got)}", token)
     value = int(raw)
     if value < min.value or value > max.value:
-        raise ValidationError(f"{line}:{column} integer {raw.decode()} outside of range [{min.value}, {max.value}]")
+        token = InputToken(reader.raw, line, column, len(raw))
+        raise ValidationError(f"integer {raw.decode()} outside of range [{min.value}, {max.value}]", token)
     constraints.log(constraint, value, min.value, max.value)
     return Number(value)
 
@@ -489,13 +559,16 @@ def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
     raw, line, column = reader.pop_token(option.value)
     if raw is None:
         got = reader.peek_until_space()
-        raise ValidationError(f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}")
+        token = InputToken(reader.raw, line, column, len(got))
+        raise ValidationError(f"expected a {option.msg()} but got {format_token(got)}", token)
     text = raw.decode()
     value = Fraction(text)
     if value < min.value or value > max.value:
-        raise ValidationError(f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]")
+        token = InputToken(reader.raw, line, column, len(raw))
+        raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
     if text.startswith("-") and value == 0:
-        raise ValidationError(f"{line}:{column} float {text} should have no sign")
+        token = InputToken(reader.raw, line, column, len(raw))
+        raise ValidationError(f"float {text} should have no sign", token)
     constraints.log(constraint, value, min.value, max.value)
     return Number(value)
 
@@ -513,20 +586,25 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
     raw, line, column = reader.pop_token(option.value)
     if raw is None:
         got = reader.peek_until_space()
-        raise ValidationError(f"{line}:{column} expected a {option.msg()} but got {msg_text(got)}")
+        token = InputToken(reader.raw, line, column, len(got))
+        raise ValidationError(f"expected a {option.msg()} but got {format_token(got)}", token)
     leading, decimals, exponent = FLOAT_PARTS.fullmatch(raw).groups()
     decimals = 0 if decimals is None else len(decimals)
     has_exp = exponent is not None
     if decimals < mindecimals.value or decimals > maxdecimals.value:
-        raise ValidationError(f"{line}:{column} float decimals outside of range [{mindecimals.value}, {maxdecimals.value}]")
+        token = InputToken(reader.raw, line, column, len(raw))
+        raise ValidationError(f"float decimals outside of range [{mindecimals.value}, {maxdecimals.value}]", token)
     if has_exp and (len(leading) != 1 or leading == b"0"):
-        raise ValidationError(f"{line}:{column} scientific float should have exactly one non-zero before the decimal dot")
+        token = InputToken(reader.raw, line, column, len(raw))
+        raise ValidationError(f"scientific float should have exactly one non-zero before the decimal dot", token)
     text = raw.decode()
     value = Fraction(text)
     if value < min.value or value > max.value:
-        raise ValidationError(f"{line}:{column} float {text} outside of range [{min.value}, {max.value}]")
+        token = InputToken(reader.raw, line, column, len(raw))
+        raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
     if text.startswith("-") and value == 0:
-        raise ValidationError(f"{line}:{column} float {text} should have no sign")
+        token = InputToken(reader.raw, line, column, len(raw))
+        raise ValidationError(f"float {text} should have no sign", token)
     constraints.log(constraint, value, min.value, max.value)
     return Number(value)
 
@@ -544,7 +622,7 @@ def REGEX(arg):
 def ASSERT(arg):
     assert_type("ASSERT", arg, Boolean)
     if not arg.value:
-        raise ValidationError("ASSERT failed")
+        raise ValidationError(f"ASSERT failed!")
 
 
 def UNSET(*args):
