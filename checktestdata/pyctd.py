@@ -60,9 +60,9 @@ def parse_args():
 def standalone_args(config):
     args = [sys.argv[0]]
     if config.constraints_file is not None:
-        sys.argv += ["--constraints_file", config.constraints_file]
+        args += ["--constraints_file", config.constraints_file]
     if config.testdata is not None:
-        sys.argv += [config.testdata]
+        args += [config.testdata]
     return args
 
 
