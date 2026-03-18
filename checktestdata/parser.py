@@ -322,7 +322,7 @@ class Parser:
         return Variable(name, args)
 
     def _value(self):
-        token = self.tokens.peek()
+        token = self.tokens.peek(required=True)
         match token.type:
             case TokenType.STRING | TokenType.INTEGER | TokenType.FLOAT:
                 constant = self.add_constant(self.tokens.pop())
@@ -346,7 +346,7 @@ class Parser:
         def recurse(precedence):
             nonlocal parts
 
-            token = self.tokens.peek()
+            token = self.tokens.peek(required=True)
             match token.type:
                 case TokenType.OPENPAR:
                     parts.append(self.tokens.pop())
@@ -378,7 +378,7 @@ class Parser:
                 case _:
                     raise ParserException(f"invalid token in expression: '{token.text()}'", token)
 
-            while True:
+            while not self.tokens.empty():
                 operator = self.tokens.peek()
                 if operator.type not in (TokenType.LOGICAL, TokenType.COMPARE, TokenType.MATH):
                     break

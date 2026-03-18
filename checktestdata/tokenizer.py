@@ -81,7 +81,9 @@ class TokenStream:
     def empty(self):
         return self.next is None
 
-    def peek(self):
+    def peek(self, required=False):
+        if required and self.next is None:
+            raise EOFException("unexpected end of file")
         return self.next
 
     def has(self, *, type=None):
