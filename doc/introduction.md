@@ -4,7 +4,7 @@ CTD files describe the expected composition of test data files using a small gra
 One line of input consisting of two small integers separated by space is specified like this:
 
 <table>
-<tr><th>CTD<th>Accept<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject</tr>
+<tr><th>CTD<th>Accept<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject</tr>
 <tr><td>
 
 ```
@@ -17,6 +17,15 @@ NEWLINE
 <td>
 
 `4 6`
+
+<td>
+
+`4  6`
+
+<td>
+
+` 4 6`
+
 
 <td>
 
