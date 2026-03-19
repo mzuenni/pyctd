@@ -4,7 +4,7 @@ CTD files describe the expected composition of test data files using a small gra
 One line of input consisting of two small integers separated by space is specified like this:
 
 <table>
-<tr><th>CTD<th>Accept<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject</tr>
+<tr><th>CTD<th>Accept<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject</tr>
 <tr><td>
 
 ```
@@ -52,7 +52,12 @@ NEWLINE
 
 </table>
 
-CTD-files are whitespace-agnostic, so the above is the same as
+
+Note the first two rejected examples; these may be hard to see. 
+If we use “`␠`” and “`␤`” to show the normally invisble space and newline characters then these two examples would be `4␠␠6␤` and `␠4␠6␤`, respectively.
+Both are _rejected_ by the CTD script, as are `4␠6␠␤` and `4␠6␤␠`.
+
+On the other hand, CTD-files themselves are whitespace-agnostic, so the above is the same as
 
 ```
 INT(1, 10) SPACE INT(1, 10) NEWLINE
@@ -63,6 +68,8 @@ but different from requiring exactly two spaces between the integers:
 ```
 INT(1, 10) SPACE SPACE INT(1, 10) NEWLINE
 ```
+The above script accepts `4␠␠6␤` but rejects `4␠6␤`.
+
 
 `INT(min, max, name)` takes an optional third argument that assigns the matched integer to a variable name.
 Variable names consist of lower case alphanumeric characters `a0`, or integer-indexed array entries like `a[2]`.
