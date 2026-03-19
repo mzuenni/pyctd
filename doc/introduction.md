@@ -37,7 +37,10 @@ NEWLINE
 6
 ```
 
-<td>`four`
+<td>
+
+`four`
+
 </table>
 
 CTD-files are whitespace-agnostic, so the above is the same as
@@ -68,11 +71,21 @@ Others express constraints. To specify that the two integers must be different, 
 <table>
 <tr><th>CTD<th>Accept<th>Reject</tr>
 <tr><td>
+
 ```
 INT(1, 10, x) SPACE INT(1, 10, y) NEWLINE
 ASSERT (x != y)
 ```
-<td>`4 6`<td>`4 4`</table>
+
+<td>
+
+`4 6`
+
+<td>
+
+`4 4`
+
+</table>
 
 You can write `ASSERT (x < y)` or even `ASSERT (x < y || x > y && x == 3)`.
 
@@ -87,7 +100,7 @@ Number representations are picky about redundant initial `0`s and signs.
 
 
 | CTD | Acc | Acc | Acc | Acc | Acc | Acc | Rej | Rej | Rej |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |  --- | --- |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `FLOAT(5.5, 10)`  | `10` | `10.0` |  `5.50` |`1e1`| `1e+1`| `1E1`| `10.`| `5.4`| `+1e1`
 
 Use `FLOAT(min, max, FIXED)` to insist on fixed-point notation (i.e., disallowing scientific notation like `1e1`).
@@ -113,26 +126,34 @@ Matches can be assigned to variables, which can occur in assertions; `STRLEN` gi
 <tr><th>CTD<th>Accept<th>Reject<th>Reject
 <tr>
 <td>
+
 ```
 INT(1, 200000, n) NEWLINE
 REGEX("[()\[\]]+", brackets) NEWLINE
 ASSERT(STRLEN(brackets) == n)
 ```
+
 <td>
+
 ```text
 5
 )([](
 ```
+
 <td>
+
 ```
 5
 ()()
 ```
+
 <td>
+
 ```
 4
 (){}
 ```
+
 </table>
 
 
@@ -145,13 +166,24 @@ Strings can be compared lexicographically:
 <th>Accept
 <th>Reject
 <tr><td>
+
 ```
 REGEX("[a-z]+", first) SPACE REGEX("[a-z]+", second) NEWLINE
 ASSERT (first < second)
 ```
-<td> `a aa`
-<td> `11 9`
-<td> `foo foo`
+
+<td> 
+
+`a aa`
+
+<td>
+
+ `11 9`
+
+<td> 
+
+`foo foo`
+
 </table>
 
 ## Selection
@@ -163,6 +195,7 @@ Check either an integer or the word `impossible`:
 <th>CTD<th>Accept<th>Accept<th>Reject
 <tr>
 <td>
+
 ```
 IF (MATCH("i"))
     STRING("impossible")
@@ -171,9 +204,19 @@ ELSE
 END
 NEWLINE
 ```
-<td>`impossible`
-<td>`42`
-<td>`impossible 42`
+
+<td>
+
+`impossible`
+
+<td>
+
+`42`
+
+<td>
+
+`impossible 42`
+
 </table>
 
 The else-branch is optional, we could also do
@@ -198,6 +241,7 @@ The input consists of
 <table>
 <tr><th>CTD<th>Accept<th>Reject</tr>
 <tr><td>
+
 ```
 INT(1, 100, n) NEWLINE
 REP(n)
@@ -205,20 +249,25 @@ REP(n)
     ASSERT (x != y)
 END
 ```
+
 <td>
+
 ```text
 3
 42 43
 99 1
 42 43
 ```
+
 <td>
+
 ```text
 3
 12 13
 14 14
 15 16
 ```
+
 </tr>
 </table>
 
@@ -231,6 +280,7 @@ To specify
 <table>
 <tr><th>CTD<th>Accept<th>Reject</tr>
 <td>
+
 ```
 INT(1, 100, n) NEWLINE
 REP(n, SPACE)
@@ -238,16 +288,21 @@ REP(n, SPACE)
 END
 NEWLINE
 ```
+
 <td>
+
 ```text
 3
 10 14 12
 ```
+
 <td>
+
 ```text
 3
 10 14 12 11
 ```
+
 </table>
 
 ## Arrays
@@ -262,14 +317,21 @@ Together these variables form an array variable called `p`.
 <table>
 <tr><th>CTD<th>Accept<th>Reject</tr>
 <tr><td>
+
 ```
 INT(1,10, a) SPACE
 REPI(i, 5, SPACE) INT(1, 10, bs[i]) END NEWLINE
 ASSERT(INARRAY(a, bs))
 ```
+
 <td>
+
 `1 5 4 3 2 1`
-<td> `1 6 5 4 3 2`
+
+<td>
+
+`1 6 5 4 3 2`
+
 </tr>
 </table>
 
@@ -277,6 +339,7 @@ Use `UNIQUE` to ensure that all elements in an array are different. Here we chec
 <table>
 <tr><th>CTD<th>Accept<th>Reject<th>Reject</tr>
 <tr><td>
+
 ```
 REPI(i, 5, SPACE)
     INT(1, 5, p[i])
@@ -287,10 +350,19 @@ END NEWLINE
 ASSERT(UNIQUE(p))
 ASSERT(UNIQUE(v))
 ```
+
 <td>
+
 `1 4 5 2 3 AOIUE`
-<td> `1 4 4 2 3 AOIUE`
-<td> `1 4 5 2 3 AOIIE`
+
+<td>
+
+ `1 4 4 2 3 AOIUE`
+
+<td>
+
+ `1 4 5 2 3 AOIIE`
+
 </tr>
 </table>
 
@@ -302,6 +374,7 @@ Use this to specify lists of unique coordinates or graph edges.
 <table>
 <tr><th>CTD<th>Accept<th>Reject</tr>
 <tr><td>
+
 ```
 REPI(i, 3)
     INT(1, 100, u[i])
@@ -311,17 +384,22 @@ REPI(i, 3)
 END
 ASSERT(UNIQUE(u, v))
 ```
+
 <td>
+
 ```
 1 2
 3 3
 2 1
 ```
+
 <td>
+
 ```
 1 2
 1 3
 1 2
 ```
+
 </tr>
 </table>
