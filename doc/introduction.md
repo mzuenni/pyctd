@@ -6,12 +6,14 @@ One line of input consisting of two small integers separated by space is specifi
 <table>
 <tr><th>CTD<th>Accept<th>Reject<th>Reject<th>Reject<th>Reject<th>Reject</tr>
 <tr><td>
+
 ```
 INT(1, 10)
 SPACE
 INT(1, 10)
 NEWLINE
 ```
+
 <td>`4 6`
 <td>`4 6 5`
 <td>`4`
