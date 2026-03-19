@@ -8,14 +8,13 @@
 This is a Python 3.10 compatible reimplementation of the checktestdata program.
 
 > [!NOTE]
-> As of now, the python implementation on supports strict file validation. The arguments `whitespace-ok` and `generate` are not supported.
+> As of now, the python implementation only supports strict file validation. The arguments `whitespace-ok` and `generate` are not supported.
 
-## Grammar
+## Documentation
 
-An introduction to the Checktestdata grammer along with some examples is given [here](https://github.com/mzuenni/pyctd/tree/main/checktestdata/doc/introduction.md).
-
-The formal language specification can be found in the
-[domjudge Checktestdata repository](https://github.com/DOMjudge/checktestdata/blob/main/doc/format-spec.md).
+* [Introduction to the Checktestdata Language](doc/introduction.md).
+* The [CTD language specification](https://github.com/DOMjudge/checktestdata/blob/main/doc/format-spec.md) at the
+[DOMjudge Checktestdata repository](https://github.com/DOMjudge/checktestdata).
 
 ## Installation
 
