@@ -1,6 +1,0 @@
-STRING("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") INT(1,2) NEWLINE
-SET(a="a", b="b")
-ASSERT(
-a ==
-b
-)
