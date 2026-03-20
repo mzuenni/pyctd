@@ -363,11 +363,11 @@ class _Reader:
             raise ValidationError(msg, token)
         self._advance(expected)
 
-    def pop_regex(self, regex, expected):
-        match = regex.match(self.raw, self.pos)
+    def pop_regex(self, regex):
+        match = compile_regex(regex).match(self.raw, self.pos)
         if not match:
             got = self.peek_until_space()
-            msg = f"got: {format_token(got)}, but expected '{format_token(expected)}'"
+            msg = f"got: {format_token(got)}, but expected '{format_token(regex)}'"
             token = InputToken(self.raw, self.line, self.column, len(got))
             raise ValidationError(msg, token)
         text = match.group()
@@ -773,8 +773,7 @@ def STRING(arg):
 
 def REGEX(arg):
     assert_type("REGEX", arg, String)
-    pattern = compile_regex(arg.value)
-    return String(reader.pop_regex(pattern, arg.value))
+    return String(reader.pop_regex(arg.value))
 
 
 def ASSERT(arg):
