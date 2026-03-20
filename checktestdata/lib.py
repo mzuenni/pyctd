@@ -5,6 +5,7 @@ from abc import ABC
 from collections import Counter
 from enum import Enum
 from fractions import Fraction
+from functools import cache
 from pathlib import Path
 
 if hasattr(sys, "set_int_max_str_digits"):
@@ -362,20 +363,16 @@ class _Reader:
             raise ValidationError(msg, token)
         self._advance(expected)
 
-    def pop_regex(self, regex):
+    def pop_regex(self, regex, expected):
         match = regex.match(self.raw, self.pos)
         if not match:
             got = self.peek_until_space()
-            msg = f"got: {format_token(got)}, but expected '{format_token(regex.pattern)}'"
+            msg = f"got: {format_token(got)}, but expected '{format_token(expected)}'"
             token = InputToken(self.raw, self.line, self.column, len(got))
             raise ValidationError(msg, token)
         text = match.group()
         self._advance(text)
         return text
-
-    def pop_pattern(self, pattern):
-        regex = re.compile(pattern, re.DOTALL | re.MULTILINE)
-        return self.pop_regex(regex)
 
     def pop_token(self, regex):
         match = regex.match(self.raw, self.pos)
@@ -391,6 +388,155 @@ class _Reader:
             else:
                 self.column += len(text)
             return text, line, column
+
+
+class RegexParserState(Enum):
+    EMPTY = 1
+    NONEMPTY = 2
+    REPEAT = 3
+
+
+class RegexParser:
+    TOKENIZER = re.compile(rb"\\[(){}[\]*+?|\\^.-]|.", re.DOTALL)
+
+    def __init__(self, raw):
+        self.raw = raw
+        self.generator = (m.group() for m in RegexParser.TOKENIZER.finditer(raw))
+        self.next = next(self.generator, None)
+        self.last = None
+        self.pos = 1
+        self.checked = []
+
+    def _error(self, msg, pos=None):
+        if pos is None:
+            pos = self.pos
+        raise Exception(f"invalid regex (at position {pos}): {msg}")
+
+    def _peek(self):
+        return self.next
+
+    def _pop(self):
+        self.last, self.next = self.next, next(self.generator, None)
+        self.pos += len(self.last or b"")
+        return self.last
+
+    def _consume(self, expected=None, literal=False):
+        if self._peek() != expected and expected is not None:
+            self._error("unexpected char")
+        token = self._pop()
+        assert token is not None
+        if literal:
+            if len(token) == 1:
+                token = re.escape(token)
+        self.checked.append(token)
+
+    def _parse_charset(self):
+        self._consume(b"[")
+        if self._peek() == b"^":
+            self._consume()
+        tmp = []
+
+        def flush_tmp():
+            nonlocal tmp
+            for token in tmp:
+                if token in b"-&~|":
+                    token = re.escape(token)
+                self.checked.append(token)
+            tmp = []
+
+        while self._peek() is not None and self._peek() != b"]":
+            if self._peek() == b"[":
+                self._error("nested charset?")
+            tmp.append(self._pop())
+
+            if len(tmp) >= 3 and tmp[-2] == b"-":
+                lhs = tmp[-3]
+                rhs = tmp[-1]
+                if lhs[-1] > rhs[-1]:
+                    self._error(f"invalid character range [{decode_unsafe(lhs)},{decode_unsafe(rhs)}]", self.pos - len(lhs) - 1 - len(rhs))
+                tmp = tmp[:-2]
+                flush_tmp()
+                self.checked.append(b"-")
+                tmp = [rhs]
+                flush_tmp()
+        flush_tmp()
+
+        self._consume(b"]")
+
+    def _parse_positive_int(self):
+        pos = self.pos
+        digits = []
+        while self._peek() is not None and self._peek() in b"0123456789":
+            digits.append(self._peek())
+            self._consume()
+        if len(digits) > 1 and digits[0] == b"0":
+            self._error("range bound has leading zeros", pos)
+        return int(b"".join(digits)) if digits else None
+
+    def _parse_repeat(self):
+        self._consume(b"{")
+        pos = self.pos
+        lower = self._parse_positive_int()
+        is_range = self._peek() == b","
+        if is_range:
+            self._consume()
+            upper = self._parse_positive_int()
+            if lower is not None and upper is not None and lower > upper:
+                self._error(f"invalid range {{{lower},{upper}}}", pos)
+        elif lower is None:
+            self._error("missing range lenght", pos)
+        self._consume(b"}")
+
+    def _parse(self):
+        state = RegexParserState.EMPTY
+
+        def transition(next):
+            nonlocal state
+            if next == RegexParserState.REPEAT:
+                if state == RegexParserState.EMPTY:
+                    self._error("nothing to repeat")
+                if state == RegexParserState.REPEAT:
+                    self._error("multiple repeats")
+            state = next
+
+        while self._peek() is not None and self._peek() != b")":
+            token = self._peek()
+            if token == b"[":
+                transition(RegexParserState.NONEMPTY)
+                self._parse_charset()
+            elif token == b"(":
+                transition(RegexParserState.NONEMPTY)
+                self._consume(b"(")
+                self.checked.append(b"?:")
+                self._parse()
+                self._consume(b")")
+            elif token == b"{":
+                transition(RegexParserState.REPEAT)
+                self._parse_repeat()
+            elif token in b"*+?":
+                transition(RegexParserState.REPEAT)
+                self._consume()
+            elif token == b"|":
+                transition(RegexParserState.EMPTY)
+                self._consume()
+            elif token == b".":
+                transition(RegexParserState.NONEMPTY)
+                self._consume()
+            else:
+                transition(RegexParserState.NONEMPTY)
+                self._consume(literal=True)
+
+    def compile(self):
+        self._parse()
+        if self._peek() is not None:
+            assert self._peek() == b")"
+            raise Exception("Unmatched parenthesis")
+        return re.compile(b"".join(self.checked), re.DOTALL)
+
+
+@cache
+def compile_regex(raw):
+    return RegexParser(raw).compile()
 
 
 class Constraints:
@@ -627,7 +773,8 @@ def STRING(arg):
 
 def REGEX(arg):
     assert_type("REGEX", arg, String)
-    return String(reader.pop_pattern(arg.value))
+    pattern = compile_regex(arg.value)
+    return String(reader.pop_regex(pattern, arg.value))
 
 
 def ASSERT(arg):
