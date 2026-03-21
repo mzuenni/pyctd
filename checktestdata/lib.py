@@ -367,7 +367,7 @@ class _Reader:
         match = compile_regex(regex).match(self.raw, self.pos)
         if not match:
             got = self.peek_until_space()
-            msg = f"got: {format_token(got)}, but expected '{format_token(regex)}'"
+            msg = f"got: {format_token(got)}, but expected {format_token(regex)}"
             token = InputToken(self.raw, self.line, self.column, len(got))
             raise ValidationError(msg, token)
         text = match.group()
