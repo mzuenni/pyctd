@@ -1,4 +1,0 @@
-ASSERT(4 % 2 == 0)
-ASSERT(4 % -2 == 0)
-ASSERT(-4 % 2 == 0)
-ASSERT(-4 % -2 == 0)

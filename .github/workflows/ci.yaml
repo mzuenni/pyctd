@@ -16,4 +16,4 @@ jobs:
       - run: git fetch --prune --unshallow --filter=tree:0
       - run: python3 -m pip install --editable .
       - run: bash test/checktestdata_tests.sh
-      - run: bash test/grammar_tests.sh
+      - run: bash test/additional_tests.sh
