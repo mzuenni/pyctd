@@ -15,6 +15,7 @@ This is a Python 3.10 compatible reimplementation of the checktestdata program.
 * [Introduction to the Checktestdata Language](doc/introduction.md).
 * The [CTD language specification](https://github.com/DOMjudge/checktestdata/blob/main/doc/format-spec.md) at the
 [DOMjudge Checktestdata repository](https://github.com/DOMjudge/checktestdata).
+* [The Regex Syntax](doc/regex.md).
 
 ## Installation
 
