@@ -1,0 +1,7 @@
+INT(0, 100, n) NEWLINE
+REP(n)
+	INT(-10,10,a) SPACE
+	INT(-10,10,b) SPACE
+	INT(-10,10,c) NEWLINE
+	ASSERT(a/b==c)
+END

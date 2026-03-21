@@ -3,7 +3,9 @@ REGEX("[e-h]") # chareacter class
 REGEX("[I-M]") # chareacter class
 REGEX("[5-8]") # chareacter class
 REGEX("[^a]") # chareacter class
-STRING(a)
-REGEX("a?") # optional
-STRING(b)
+STRING("a")
+REGEX("x?") # optional
+REGEX("y?") # optional
+REGEX("z?") # optional
+STRING("b")
 REGEX(".+") # any including newline
