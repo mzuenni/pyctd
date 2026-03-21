@@ -1,0 +1,8 @@
+INT(0, 100, n) NEWLINE
+REP(n)
+	STRING("\"") REGEX("[^\"]*", regex) STRING("\"")
+	SPACE
+	REGEX(regex)
+	NEWLINE
+END
+EOF

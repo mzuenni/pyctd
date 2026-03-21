@@ -17,3 +17,4 @@ jobs:
       - run: python3 -m pip install --editable .
       - run: bash test/checktestdata_tests.sh
       - run: bash test/additional_tests.sh
+      - run: bash test/strict_tests.sh
