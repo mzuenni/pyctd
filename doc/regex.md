@@ -9,7 +9,7 @@ Additionally, more complex regular expressions can beexpressed by concatenating 
 If *A* and *B* are both regular expressions, then *AB* is also a regular expression.
 In general, if a string *x* matches *A* and another string *y* matches *B*, then the string *xy* matches *AB*.
 
-Besides the literal characters there are also the following special characters: `'('`, `')'`, `'{'`, `'}'`, `'}'`, `'['`, `']'`, `'*'`, `'+'`, `'?'`, `'|'`, `'\'`, `'^'`, `'.'`, `'-'`.
+Besides the literal characters there are also the following special characters: `'('`, `')'`, `'{'`, `'}'`, `'['`, `']'`, `'*'`, `'+'`, `'?'`, `'|'`, `'\'`, `'^'`, `'.'`, `'-'`.
 There meaning is as follows:
 
 * `.`: this matches any character, including newlines. If you need to match anything except the newline character use `[^\n]` instead.
