@@ -457,7 +457,8 @@ class RegexParser:
                 lhs = tmp[-3]
                 rhs = tmp[-1]
                 if lhs[-1] > rhs[-1]:
-                    self._error(f"invalid character range [{decode_unsafe(lhs)},{decode_unsafe(rhs)}]", self.pos - len(lhs) - 1 - len(rhs))
+                    pos = self.pos - len(lhs) - 1 - len(rhs)
+                    self._error(f"invalid character range [{decode_unsafe(lhs)},{decode_unsafe(rhs)}]", pos)
                 tmp = tmp[:-2]
                 flush_tmp()
                 self.checked.append(b"-")
