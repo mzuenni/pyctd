@@ -427,9 +427,8 @@ class RegexParser:
             self._error("unexpected char")
         token = self._pop()
         assert token is not None
-        if literal:
-            if len(token) == 1:
-                token = re.escape(token)
+        if literal and len(token) == 1:
+            token = re.escape(token)
         self.checked.append(token)
 
     def _parse_charset(self):
