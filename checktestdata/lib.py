@@ -44,7 +44,9 @@ def crop(text, limit=25):
     return text
 
 
-def format_token(raw):
+def format_token(raw, handle_eof=True):
+    if raw == b"" and not handle_eof:
+        return "``"
     special = {
         b" ": "<SPACE>",
         b"\n": "<NEWLINE>",
@@ -354,7 +356,7 @@ class _Reader:
         if not self.raw.startswith(expected, self.pos):
             got = self.raw[self.pos : self.pos + len(expected)]
             mismatch = next((i for i, c in enumerate(zip(got, expected)) if c[0] != c[1]), min(len(got), len(expected)))
-            msg = f"got: {format_token(got)}, but expected {format_token(expected)}"
+            msg = f"got: {format_token(got)}, but expected {format_token(expected, False)}"
             if expected == b"\n" and got == b"\r":
                 msg += ' (use explicit STRING("\\r\\n") for windows newlines)'
             elif mismatch > 5:
@@ -367,7 +369,7 @@ class _Reader:
         match = compile_regex(regex).match(self.raw, self.pos)
         if not match:
             got = self.peek_until_space()
-            msg = f"got: {format_token(got)}, but expected {format_token(regex)}"
+            msg = f"got: {format_token(got)}, but expected {format_token(regex, False)}"
             token = InputToken(self.raw, self.line, self.column, len(got))
             raise ValidationError(msg, token)
         text = match.group()
