@@ -537,7 +537,7 @@ class RegexParser:
         self._parse()
         if self._peek() is not None:
             assert self._peek() == b")"
-            raise Exception("Unmatched parenthesis")
+            self._error("unmatched parenthesis")
         return re.compile(b"".join(self.checked), re.DOTALL)
 
 
