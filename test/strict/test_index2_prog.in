@@ -1,0 +1,3 @@
+SET(a[1]=1)
+UNSET(a)
+SET(a=1)

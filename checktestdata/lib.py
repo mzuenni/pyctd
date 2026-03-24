@@ -267,13 +267,12 @@ class Number(Value):
 
 
 class VarType:
-    __slots__ = ("name", "data", "entries", "value_count")
+    __slots__ = ("name", "dimension", "data", "entries", "value_count")
 
     def __init__(self, name):
         self.name = name
-        # in checktestdata <var> = <val> is a shorthand for var[] = <val>
-        # in other words: its just another entry in the array
-        # (we keep them separated since this is more efficient)
+        self.dimension = None
+        # we store dimension 0 values explicity since this is more efficient
         self.data = None
         self.entries = {}
         self.value_count = Counter()
@@ -282,20 +281,28 @@ class VarType:
         return f"VarType({repr(self.name)})"
 
     def reset(self):
+        self.dimension = None
         self.data = None
         self.entries = {}
         self.value_count = Counter()
 
     def __getitem__(self, key):
+        if self.dimension is None:
+            if key is None:
+                raise TypeError(f"{self.name} is not assigned")
+            else:
+                raise TypeError(f"missing key in {self.name}")
         if key is None:
-            if self.entries:
+            if self.dimension > 0:
                 raise TypeError(f"{self.name} is an array, not a value")
             if self.data is None:
                 raise TypeError(f"{self.name} is not assigned")
             return self.data
         else:
-            if self.data is not None:
-                raise TypeError(f"{self.name} is a value not an array")
+            if len(key) != self.dimension:
+                raise TypeError(f"{self.name} is an array of dimension {self.dimension}, not dimension {len(key)}")
+            if any(not isinstance(entry, Number) for entry in key):
+                raise TypeError(f"key for {self.name} must be integer(s)")
             if key not in self.entries:
                 raise TypeError(f"missing key in {self.name}")
             return self.entries[key]
@@ -303,16 +310,18 @@ class VarType:
     def __setitem__(self, key, value):
         assert isinstance(value, Value), self.name
         if key is None:
-            if self.entries:
+            if self.dimension is None:
+                self.dimension = 0
+            elif self.dimension > 0:
                 raise TypeError(f"{self.name} is an array, not a value")
             self.data = value
         else:
-            if self.data is not None:
-                raise TypeError(f"{self.name} is a value not an array")
-            for key_part in key:
-                # Checktestdata seems to enforce integers here
-                if not isinstance(key_part, Number) or not key_part.is_integer():
-                    raise TypeError(f"key for {self.name} must be integer(s)")
+            if self.dimension is None:
+                self.dimension = len(key)
+            elif len(key) != self.dimension:
+                raise TypeError(f"{self.name} is an array of dimension {self.dimension}, not dimension {len(key)}")
+            if any(not isinstance(entry, Number) or not entry.is_integer() for entry in key):
+                raise TypeError(f"key for {self.name} must be integer(s)")
             if key in self.entries:
                 self.value_count[self.entries[key]] -= 1
             self.entries[key] = value
@@ -323,9 +332,10 @@ def assert_type(method, arg, t):
     if not isinstance(arg, t):
         raise TypeError(f"{method} cannot be invoked with {arg.__class__.__name__}")
 
+
 def assert_array(method, arg):
     assert isinstance(arg, VarType)
-    if arg.data is not None:
+    if arg.dimension == 0:
         raise TypeError(f"{method} must be invoked with an array variable")
 
 
