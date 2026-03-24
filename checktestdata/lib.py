@@ -440,7 +440,7 @@ class RegexParser:
         def flush_tmp():
             nonlocal tmp
             for token in tmp:
-                if token in b"-&~|":
+                if token in b"-&~|\\^":
                     token = re.escape(token)
                 self.checked.append(token)
             tmp = []
@@ -457,7 +457,7 @@ class RegexParser:
                 rhs = tmp[-1]
                 if lhs[-1] > rhs[-1]:
                     pos = self.pos - len(lhs) - 1 - len(rhs)
-                    self._error(f"invalid character range [{decode_unsafe(lhs)},{decode_unsafe(rhs)}]", pos)
+                    self._error(f"invalid character range [{decode_unsafe(lhs)}-{decode_unsafe(rhs)}]", pos)
                 tmp = tmp[:-2]
                 flush_tmp()
                 self.checked.append(b"-")
@@ -470,7 +470,7 @@ class RegexParser:
 
         self._consume(b"]")
 
-    def _parse_positive_int(self):
+    def _parse_non_negative_int(self):
         pos = self.pos
         digits = []
         while self._peek() is not None and self._peek() in b"0123456789":
@@ -483,15 +483,14 @@ class RegexParser:
     def _parse_repeat(self):
         self._consume(b"{")
         pos = self.pos
-        lower = self._parse_positive_int()
-        is_range = self._peek() == b","
-        if is_range:
+        lower = self._parse_non_negative_int()
+        if self._peek() == b",":
             self._consume()
-            upper = self._parse_positive_int()
+            upper = self._parse_non_negative_int()
             if lower is not None and upper is not None and lower > upper:
                 self._error(f"invalid range {{{lower},{upper}}}", pos)
         elif lower is None:
-            self._error("missing range lenght", pos)
+            self._error("missing range length", pos)
         self._consume(b"}")
 
     def _parse(self):
