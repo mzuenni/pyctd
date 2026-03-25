@@ -14,7 +14,7 @@ class ParserException(Exception):
         self.token = token
 
 
-ESCAPE_REGEX = re.compile(rb'\\([0-7]{1,3}|[\n\\"ntrb])', re.DOTALL | re.MULTILINE)
+ESCAPE_REGEX = re.compile(rb'\\([0-7]{1,3}|[\n\\"ntrb])')
 
 
 def parse_string(token):

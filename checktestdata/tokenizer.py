@@ -134,7 +134,7 @@ def tokenize(raw):
         "UNKNOWN": rb".",
     }
     combined = b"|".join(b"(?P<%s>%s)" % (name.encode(), regex) for name, regex in token_regex.items())
-    base_tokenizer = re.compile(combined, re.DOTALL | re.MULTILINE)
+    base_tokenizer = re.compile(combined, re.DOTALL)
     integer_token = re.compile(rb"0|[1-9][0-9]*")
 
     def keyword_type(keyword):

@@ -335,7 +335,7 @@ class _Reader:
         self.pos = 0
         self.line = 1
         self.column = 1
-        self.space_tokenizer = re.compile(rb"[\s]|[^\s]*", re.DOTALL | re.MULTILINE)
+        self.space_tokenizer = re.compile(rb"[\s]|[^\s]*")
 
     def _advance(self, text):
         self.pos += len(text)
