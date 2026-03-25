@@ -30,7 +30,7 @@ class TokenType(Enum):
     UNKNOWN = auto()
 
 
-@dataclass
+@dataclass(slots=True)
 class Token:
     raw: bytes
     start: int
