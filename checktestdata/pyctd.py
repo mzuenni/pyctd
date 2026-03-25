@@ -3,6 +3,7 @@ import sys
 import traceback
 from pathlib import Path
 
+from checktestdata import __version__
 from checktestdata.lib import ValidationError
 from checktestdata.parser import parse, ParserException
 from checktestdata.tokenizer import tokenize
@@ -10,6 +11,12 @@ from checktestdata.tokenizer import tokenize
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Checktestdata tool written in Python.")
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=__version__,
+    )
     parser.add_argument(
         "-d",
         "--debug",
