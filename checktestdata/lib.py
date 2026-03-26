@@ -639,7 +639,7 @@ def MATCH(arg):
     assert_type("MATCH", arg, String)
     char = reader.peek_char()
     if not char:
-        return False
+        return Boolean(False)
     return Boolean(char in arg.value)
 
 
