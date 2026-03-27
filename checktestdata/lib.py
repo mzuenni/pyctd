@@ -323,7 +323,7 @@ FLOAT_PARTS = re.compile(rb"-?([0-9]*)(?:\.([0-9]*))?(?:[eE](.*))?")
 class FLOAT_OPTION(Enum):
     ANY = re.compile(rb"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))?")
     FIXED = re.compile(rb"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?")
-    SCIENTIFIC = re.compile(rb"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?(?:0|[1-9][0-9]*))")
+    SCIENTIFIC = re.compile(rb"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?[eE][+-]?(?:0|[1-9][0-9]*)")
 
     def msg(self):
         return "float" if self == FLOAT_OPTION.ANY else f"{self.name.lower()} float"
@@ -640,7 +640,7 @@ def MATCH(arg):
     char = reader.peek_char()
     if not char:
         return Boolean(False)
-    return Boolean(char in arg.value)
+    return Boolean(char[0] in arg.value)
 
 
 def ISEOF():
@@ -708,7 +708,7 @@ def INT(min, max, constraint=None):
         token = InputToken(reader.raw, line, column, len(got))
         raise ValidationError(f"expected an integer but got {format_token(got)}", token)
     value = int(raw)
-    if value < min.value or value > max.value:
+    if not min.value <= value <= max.value:
         token = InputToken(reader.raw, line, column, len(raw))
         raise ValidationError(f"integer {raw.decode()} outside of range [{min.value}, {max.value}]", token)
     constraints.log(constraint, value, min.value, max.value)
@@ -726,7 +726,7 @@ def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
         raise ValidationError(f"expected a {option.msg()} but got {format_token(got)}", token)
     text = raw.decode()
     value = Fraction(text)
-    if value < min.value or value > max.value:
+    if not min.value <= value <= max.value:
         token = InputToken(reader.raw, line, column, len(raw))
         raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
     if text.startswith("-") and value == 0:
@@ -754,7 +754,7 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
     leading, decimals, exponent = FLOAT_PARTS.fullmatch(raw).groups()
     decimals = 0 if decimals is None else len(decimals)
     has_exp = exponent is not None
-    if decimals < mindecimals.value or decimals > maxdecimals.value:
+    if not mindecimals.value <= decimals <= maxdecimals.value:
         token = InputToken(reader.raw, line, column, len(raw))
         raise ValidationError(f"float decimals outside of range [{mindecimals.value}, {maxdecimals.value}]", token)
     if has_exp and (len(leading) != 1 or leading == b"0"):
@@ -762,7 +762,7 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
         raise ValidationError("scientific float should have exactly one non-zero before the decimal dot", token)
     text = raw.decode()
     value = Fraction(text)
-    if value < min.value or value > max.value:
+    if not min.value <= value <= max.value:
         token = InputToken(reader.raw, line, column, len(raw))
         raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
     if text.startswith("-") and value == 0:
