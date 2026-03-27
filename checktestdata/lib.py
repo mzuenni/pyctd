@@ -335,9 +335,9 @@ class _Reader:
 
     def _advance(self, text):
         self.pos += len(text)
-        newline = text.find(b"\n")
+        newline = text.find(0x0A)
         if newline >= 0:
-            self.line += text.count(b"\n")
+            self.line += text.count(0x0A)
             self.column = len(text) - newline
         else:
             self.column += len(text)
@@ -770,9 +770,9 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
     assert_type("FLOATP", max, Number)
     assert_type("FLOATP", mindecimals, Number)
     assert_type("FLOATP", maxdecimals, Number)
-    if not isinstance(mindecimals.value, int) or mindecimals.value < 0:
+    if not mindecimals.is_integer() or mindecimals.value < 0:
         raise TypeError("FLOATP(mindecimals) must be a non-negative integer")
-    if not isinstance(maxdecimals.value, int) or maxdecimals.value < 0:
+    if not maxdecimals.is_integer() or maxdecimals.value < 0:
         raise TypeError("FLOATP(maxdecimals) must be a non-negative integer")
     line, column = reader.line, reader.column
     raw = reader.pop_base_number(b"-")
