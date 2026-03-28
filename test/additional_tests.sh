@@ -67,14 +67,16 @@ for prog in additional/test_*_prog.in; do
     base="${prog%_prog.*}"
     echo "${base}"
 
-    # Successful cases
-    for data in "${base}"_data.in*; do
-        checksucc
-    done
+    for prog in "${base}"_prog.in*; do
+        # Successful cases
+        for data in "${base}"_data.in*; do
+            checksucc
+        done
 
-    # Expected failure cases (.err data)
-    for data in "${base}"_data.err*; do
-        checkfail
+        # Expected failure cases (.err data)
+        for data in "${base}"_data.err*; do
+            checkfail
+        done
     done
 
     # Program error cases

@@ -1,4 +1,4 @@
 SET(a=1)
 SET(b=1)
-SET(b[1]=1)
+SET(b[1]=2)
 ASSERT(UNIQUE(a,b))
