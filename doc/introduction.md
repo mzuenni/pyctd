@@ -53,7 +53,7 @@ NEWLINE
 </table>
 
 
-Note the first two rejected examples; these may be hard to see. 
+Note the first two rejected examples; these may be hard to see.
 If we use “`␠`” and “`␤`” to show the normally invisble space and newline characters then these two examples would be `4␠␠6␤` and `␠4␠6␤`, respectively.
 Both are _rejected_ by the CTD script, as are `4␠6␠␤` and `4␠6␤␠`.
 
@@ -188,7 +188,7 @@ REGEX("[a-z]+", first) SPACE REGEX("[a-z]+", second) NEWLINE
 ASSERT (first < second)
 ```
 
-<td> 
+<td>
 
 `a aa`
 
@@ -196,7 +196,7 @@ ASSERT (first < second)
 
  `11 9`
 
-<td> 
+<td>
 
 `foo foo`
 

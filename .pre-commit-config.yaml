@@ -12,3 +12,14 @@ repos:
     -   id: ruff
         args: [ --fix ]
     -   id: ruff-format
+-   repo: local
+    hooks:
+    -   id: prevent-version-commit
+        name: Prevent committing checktestdata/__version__.py
+        entry: >
+            bash -c '
+            git diff --cached --name-only | grep -q "^checktestdata/__version__.py$" &&
+            { echo "Error: Do not commit __version__.py"; exit 1; } || exit 0
+            '
+        language: system
+        files: checktestdata/__version__.py
