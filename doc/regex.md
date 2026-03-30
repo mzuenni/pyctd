@@ -24,7 +24,7 @@ Inside a set definition:
     If `^` is escaped (e.g. `[\^]`) or if it is not the first character (e.g. `[a^]`) it will match a literal `'^'`.
     * `\` can be used to escape any special characters.
     However, most special characters do not need to be escaped.
-    Only `']'` must be escaped and `'^'` or `'-'` might need to be escaped depending on the position.
+    Only `'['` and `']'` must be escaped and `'^'` or `'-'` might need to be escaped depending on the position.
     For example both `[\-]` and `[-]` will match a literal `'-'`.
     If `\` is not followed by any special characters it matches a literal `'\'`.
     * It is an error if the character set does not specify any characters (e.g. `[]` or `[^]`).
