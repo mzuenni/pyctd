@@ -182,7 +182,7 @@ class Expression:
         if lhs.type != rhs.type or not issubclass(lhs.type, op.in_type):
             raise TypeError(f"unsupported operand type(s) for {op.ctd}: '{lhs.type.__name__}' and '{rhs.type.__name__}'")
         if lhs.is_value((Boolean, Number)) and rhs.is_value((Boolean, Number)):
-            return Expression(op.out_type, op.function(lhs.lhs, rhs.rhs))
+            return Expression(op.out_type, op.function(lhs.lhs, rhs.lhs))
         # TODO: try some more constant folding
         return Expression(op.out_type, lhs, op.python, rhs)
 
