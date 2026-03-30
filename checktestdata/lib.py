@@ -134,6 +134,13 @@ class Boolean:
         Boolean._check_boolean_type(self, other)
         return Boolean(self.value or other.value)
 
+    def __eq__(self, other):
+        raise TypeError(f"unsupported operand type(s) for ==: 'Boolean' and '{other.__class__.__name__}'")
+
+    def __ne__(self, other):
+        Value._check_compare_type(self, other)
+        raise TypeError(f"unsupported operand type(s) for !=: 'Boolean' and '{other.__class__.__name__}'")
+
 
 class Value(ABC):
     __slots__ = ("value",)
