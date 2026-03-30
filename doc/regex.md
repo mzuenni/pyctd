@@ -25,7 +25,7 @@ Inside a set definition:
     * `\` can be used to escape any special characters.
     However, most special characters do not need to be escaped.
     Only `']'` must be escaped and `'^'` or `'-'` might need to be escaped depending on the position.
-    For example both `[\[]` and `[[]` will match a literal `'['`.
+    For example both `[\-]` and `[-]` will match a literal `'-'`.
     If `\` is not followed by any special characters it matches a literal `'\'`.
     * It is an error if the character set does not specify any characters (e.g. `[]` or `[^]`).
 * `{m,n}`: causes the resulting regular expression to match from `m` to `n` repetitions of the preceding regular expression.
