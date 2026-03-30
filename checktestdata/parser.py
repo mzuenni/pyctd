@@ -48,6 +48,8 @@ def parse_string(token):
 
 
 class Comment:
+    __slots__ = ("tokens",)
+
     def __init__(self, tokens):
         self.tokens = tokens
 
@@ -64,6 +66,8 @@ class Comment:
 
 
 class Command:
+    __slots__ = ("token", "arguments")
+
     def __init__(self, token, arguments=None):
         self.token = token
         self.arguments = arguments or []
@@ -75,6 +79,8 @@ class Command:
 
 
 class Variable:
+    __slots__ = ("name", "arguments")
+
     def __init__(self, name, arguments=None):
         self.name = name
         self.arguments = arguments or None
@@ -84,27 +90,12 @@ class Variable:
             args = ", ".join(map(str, self.arguments))
             return f"{self.name}[{args},]"
         else:
-            # return str(self.token)
             return f"{self.name}[None]"
 
 
-class Operator:
-    PYTHON_OPERATOR = {
-        "!": "~",
-        "^": "**",
-        "&&": " and ",
-        "||": " or ",
-    }
-
-    def __init__(self, token):
-        self.token = token
-
-    def __str__(self):
-        op = self.token.text()
-        return Operator.PYTHON_OPERATOR.get(op, op)
-
-
 class Assignment:
+    __slots__ = ("lhs", "rhs")
+
     def __init__(self, lhs, rhs):
         self.lhs = lhs if isinstance(lhs, list) else [lhs]
         self.rhs = rhs if isinstance(lhs, list) else [rhs]
@@ -117,23 +108,9 @@ class Assignment:
         # return f"{lhs} = {rhs}"
 
 
-class Expression:
-    def __init__(self, parts):
-        self.parts = parts
-
-    def __str__(self):
-        return "".join(map(str, self.parts))
-
-
-class BlockBegin:
-    def __init__(self, command):
-        self.command = command
-
-    def __str__(self):
-        return f"{self.command}:"
-
-
 class If:
+    __slots__ = ("condition",)
+
     def __init__(self, condition):
         self.condition = condition
 
@@ -142,12 +119,80 @@ class If:
 
 
 class For:
+    __slots__ = ("range", "variable")
+
     def __init__(self, range, variable="_"):
         self.range = range
         self.variable = variable
 
     def __str__(self):
         return f"for {self.variable} in {self.range}:"
+
+
+class Operator:
+    __slots__ = (
+        "ctd",
+        "python",
+        "function",
+        "precedence",
+        "in_type",
+        "out_type",
+    )
+
+    def __init__(self, ctd, python, function, precedence, in_type, out_type):
+        self.ctd = ctd
+        self.python = python
+        self.function = function
+        self.precedence = precedence
+        self.in_type = in_type
+        self.out_type = out_type
+
+    def __str__(self):
+        return self.python
+
+
+class Expression:
+    __slots__ = ("lhs", "op", "rhs", "type")
+
+    def __init__(self, type, lhs, op=None, rhs=None):
+        assert (op is None) == (rhs is None)
+        self.type = type
+        self.lhs = lhs
+        self.op = op
+        self.rhs = rhs
+
+    def is_value(self, type):
+        return self.op is None and isinstance(self.lhs, type)
+
+    def __neg__(self):
+        if not issubclass(self.type, Value):
+            raise TypeError(f"bad operand type for unary -: '{self.type.__name__}'")
+        if self.is_value(Number):
+            return Expression(Value, -self.lhs)
+        return Expression(Value, None, "-", self)
+
+    def __invert__(self):
+        if not issubclass(self.type, Boolean):
+            raise TypeError(f"bad operand type for unary !: '{self.type.__name__}'")
+        if self.is_value(Boolean):
+            return Expression(Boolean, ~self.lhs)
+        return Expression(Boolean, None, "~", self)
+
+    def binary_operator(lhs, op, rhs):
+        if lhs.type != rhs.type or not issubclass(lhs.type, op.in_type):
+            raise TypeError(f"unsupported operand type(s) for {op.ctd}: '{lhs.type.__name__}' and '{rhs.type.__name__}'")
+        if lhs.is_value((Boolean, Number)) and rhs.is_value((Boolean, Number)):
+            return Expression(op.out_type, op.function(lhs.lhs, rhs.rhs))
+        # TODO: try some more constant folding
+        return Expression(op.out_type, lhs, op.python, rhs)
+
+    def __str__(self):
+        if self.op is None:
+            return str(self.lhs)
+        elif self.lhs is None:
+            return f"{self.op}{self.rhs}"
+        else:
+            return f"({self.lhs}{self.op}{self.rhs})"
 
 
 def _ellipsis(*args):
@@ -164,6 +209,7 @@ class Parser:
         self.lines = None
         self.variables = None
         self.constants = None
+        self.rev_constants = None
         self.locals = 0
 
     def _add_debug_info(self, indent):
@@ -177,19 +223,21 @@ class Parser:
         self._add_debug_info(indent)
         self.lines.append((indent, line))
 
-    def add_constant(self, token):
-        value = None
-        match token.type:
-            case TokenType.INTEGER:
-                value = Number(int(token.bytes()))
-            case TokenType.FLOAT:
-                value = Number(fractions.Fraction(token.text()))
-            case TokenType.STRING:
-                value = String(parse_string(token))
-            case _:
-                assert False
-        name = f"const_{len(self.constants)}"
-        self.constants[name] = value
+    def add_constant(self, value):
+        if value.value is True:
+            self.constants["const_true"] = Boolean(True)
+            return "const_true"
+        elif value.value is False:
+            self.constants["const_false"] = Boolean(False)
+            return "const_false"
+        assert isinstance(value, Value)
+        key = (type(value), value.value)
+        if key in self.rev_constants:
+            name = self.rev_constants[key]
+        else:
+            name = f"const_{len(self.constants)}"
+            self.rev_constants[key] = name
+            self.constants[name] = value
         return name
 
     def add_variable(self, token):
@@ -206,30 +254,30 @@ class Parser:
 
     SIGNATURES = {
         # tests
-        "MATCH": ["_value"],
-        "ISEOF": None,
-        "UNIQUE": _ellipsis("_varname"),
-        "INARRAY": ["_expr", "_varname"],
+        b"MATCH": ["_value"],
+        b"ISEOF": None,
+        b"UNIQUE": _ellipsis("_varname"),
+        b"INARRAY": ["_expr", "_varname"],
         # functions
-        "STRLEN": ["_value"],
+        b"STRLEN": ["_value"],
         # commands
-        "SPACE": None,
-        "NEWLINE": None,
-        "EOF": None,
-        "INT": ["_expr", "_expr", ["_constraint_variable"]],
-        "FLOAT": ["_expr", "_expr", ["_constraint_variable", [TokenType.OPTION]]],
-        "FLOATP": ["_expr", "_expr", "_expr", "_expr", ["_constraint_variable", [TokenType.OPTION]]],
-        "STRING": ["_value"],
-        "REGEX": ["_value", ["_variable"]],
-        "ASSERT": ["_test_expr"],
-        "SET": _ellipsis("_set_argument"),
-        "UNSET": _ellipsis("_varname"),
+        b"SPACE": None,
+        b"NEWLINE": None,
+        b"EOF": None,
+        b"INT": ["_expr", "_expr", ["_constraint_variable"]],
+        b"FLOAT": ["_expr", "_expr", ["_constraint_variable", [TokenType.OPTION]]],
+        b"FLOATP": ["_expr", "_expr", "_expr", "_expr", ["_constraint_variable", [TokenType.OPTION]]],
+        b"STRING": ["_value"],
+        b"REGEX": ["_value", ["_variable"]],
+        b"ASSERT": ["_test_expr"],
+        b"SET": _ellipsis("_set_argument"),
+        b"UNSET": _ellipsis("_varname"),
         # control flow
-        "REP": ["_expr", ["_command"]],
-        "REPI": ["_variable", "_expr", ["_command"]],
-        "WHILE": ["_test_expr", ["_command"]],
-        "WHILEI": ["_variable", "_test_expr", ["_command"]],
-        "IF": ["_test_expr"],
+        b"REP": ["_expr", ["_command"]],
+        b"REPI": ["_variable", "_expr", ["_command"]],
+        b"WHILE": ["_test_expr", ["_command"]],
+        b"WHILEI": ["_variable", "_test_expr", ["_command"]],
+        b"IF": ["_test_expr"],
     }
 
     def _parse_signature(self, token):
@@ -263,7 +311,7 @@ class Parser:
                 else:
                     assert False, f"signature error: {arg}"
 
-        args = Parser.SIGNATURES[token.text()]
+        args = Parser.SIGNATURES[token.bytes()]
         if args is not None:
             self.tokens.pop(expected_type=TokenType.OPENPAR)
             recurse(args)
@@ -279,7 +327,7 @@ class Parser:
     def _command(self):
         token = self.tokens.pop(expected_type=TokenType.COMMAND)
         args, variable = self._parse_signature(token)
-        if token.text() == "SET":
+        if token.bytes() == b"SET":
             assert variable is None
             assert all(isinstance(a, Assignment) for a in args)
             lhs = sum([a.lhs for a in args], [])
@@ -305,8 +353,7 @@ class Parser:
 
     def _varname(self):
         token = self.tokens.pop(expected_type=TokenType.VARNAME)
-        name = self.add_variable(token)
-        return name
+        return self.add_variable(token)
 
     def _variable(self):
         token = self.tokens.pop(expected_type=TokenType.VARNAME)
@@ -321,90 +368,102 @@ class Parser:
         name = self.add_variable(token)
         return Variable(name, args)
 
-    def _value(self):
+    def _value(self, as_constant=True):
         token = self.tokens.peek(required=True)
+        value = None
         match token.type:
-            case TokenType.STRING | TokenType.INTEGER | TokenType.FLOAT:
-                constant = self.add_constant(self.tokens.pop())
-                return constant
+            case TokenType.STRING:
+                value = String(parse_string(self.tokens.pop()))
+            case TokenType.INTEGER:
+                value = Number(int(self.tokens.pop().bytes()))
+            case TokenType.FLOAT:
+                value = Number(fractions.Fraction(self.tokens.pop().text()))
             case TokenType.VARNAME:
                 return self._variable()
             case TokenType.FUNCTION:
                 return self._function()
             case _:
                 raise ParserException(f"expected expression, but got '{token.text()}'", token)
+        assert value is not None
+        return self.add_constant(value) if as_constant else value
 
-    OPERATOR_SIGNATURES = (
-        (TokenType.MATH, Value),
-        (TokenType.COMPARE, Value),
-        (TokenType.LOGICAL, Boolean),
-    )
+    BINARY_OPERATORS = {
+        # pow
+        b"^": Operator("^", "**", lambda x, y: x**y, 8, Value, Value),
+        # Unary Minus: 7
+        # multiplication/division/mod
+        b"*": Operator("*", "*", lambda x, y: x * y, 6, Value, Value),
+        b"/": Operator("/", "/", lambda x, y: x / y, 6, Value, Value),
+        b"%": Operator("%", "%", lambda x, y: x % y, 6, Value, Value),
+        # addition/subtraction
+        b"+": Operator("+", "+", lambda x, y: x + y, 5, Value, Value),
+        b"-": Operator("-", "-", lambda x, y: x - y, 5, Value, Value),
+        # comparison (checktestdata does not allow any kind of comparison between booleans)
+        b"<": Operator("<", "<", lambda x, y: x < y, 4, Value, Boolean),
+        b">": Operator(">", ">", lambda x, y: x > y, 4, Value, Boolean),
+        b"<=": Operator("<=", "<=", lambda x, y: x <= y, 4, Value, Boolean),
+        b">=": Operator(">=", ">=", lambda x, y: x >= y, 4, Value, Boolean),
+        b"!=": Operator("!=", "!=", lambda x, y: x != y, 4, Value, Boolean),
+        b"==": Operator("==", "==", lambda x, y: x == y, 4, Value, Boolean),
+        # logical
+        # unary not: 3
+        b"&&": Operator("&&", " and ", lambda x, y: x and y, 2, Boolean, Boolean),
+        b"||": Operator("||", " or ", lambda x, y: x or y, 1, Boolean, Boolean),
+    }
 
-    def _parse_expr(self, root_precedence, expected):
-        parts = []
-
-        def recurse(precedence):
-            nonlocal parts
-
+    def _parse_expr(self, expected):
+        def recurse(precedence=0):
             token = self.tokens.peek(required=True)
             match token.type:
                 case TokenType.OPENPAR:
-                    parts.append(self.tokens.pop())
-                    lhs = recurse(root_precedence)
-                    parts.append(self.tokens.pop(expected_type=TokenType.CLOSEPAR))
-                case TokenType.MATH if token.text() == "-":
-                    parts.append(Operator(self.tokens.pop()))
-                    lhs = recurse(TokenType.MATH.value)
-                    if lhs != Value:
-                        raise ParserException(f"bad operand type for unary -: '{lhs.__name__}'")
+                    self.tokens.pop()
+                    lhs = recurse()
+                    self.tokens.pop(expected_type=TokenType.CLOSEPAR)
+                case TokenType.MATH if token.bytes() == b"-":
+                    self.tokens.pop()
+                    lhs = -recurse(7)
                 case TokenType.NOT if expected == Boolean:
-                    parts.append(Operator(self.tokens.pop()))
-                    lhs = recurse(TokenType.LOGICAL.value)
-                    if lhs != Boolean:
-                        raise ParserException(f"bad operand type for unary !: '{lhs.__name__}'")
-                case TokenType.STRING | TokenType.INTEGER | TokenType.FLOAT:
-                    lhs = Value
-                    constant = self.add_constant(self.tokens.pop())
-                    parts.append(constant)
-                case TokenType.VARNAME:
-                    lhs = Value
-                    parts.append(self._variable())
-                case TokenType.FUNCTION:
-                    lhs = Value
-                    parts.append(self._function())
+                    self.tokens.pop()
+                    lhs = ~recurse(3)
+                case TokenType.STRING | TokenType.INTEGER | TokenType.FLOAT | TokenType.VARNAME | TokenType.FUNCTION:
+                    lhs = Expression(Value, self._value(as_constant=False))
                 case TokenType.TEST if expected == Boolean:
-                    lhs = Boolean
-                    parts.append(self._test())
+                    lhs = Expression(Boolean, self._test())
                 case _:
                     raise ParserException(f"invalid token in expression: '{token.text()}'", token)
 
             while not self.tokens.empty():
-                operator = self.tokens.peek()
-                if operator.type not in (TokenType.LOGICAL, TokenType.COMPARE, TokenType.MATH):
+                operator = Parser.BINARY_OPERATORS.get(self.tokens.peek().bytes())
+                if operator is None or operator.precedence < precedence:
                     break
-                if operator.type.value < precedence:
-                    break
-                if (operator.type, lhs) not in Parser.OPERATOR_SIGNATURES:
-                    raise TypeError(f"unsupported operand type(s) for {operator}: '{lhs.__name__}' and '?'")
-                parts.append(Operator(self.tokens.pop()))
-                rhs = recurse(operator.type.value + 1)
-                if (operator.type, rhs) not in Parser.OPERATOR_SIGNATURES:
-                    raise TypeError(f"unsupported operand type(s) for {operator}: '?' and '{rhs.__name__}'")
-                if operator.type == TokenType.COMPARE:
-                    lhs = Boolean
+                self.tokens.pop()
+                lhs = lhs.binary_operator(operator, recurse(operator.precedence + 1))
 
             return lhs
 
-        type = recurse(root_precedence)
-        if type != expected:
-            raise ParserException(f"invalid expression starting with: '{parts[0].text()}'", parts[0])
-        return Expression(parts)
+        first = self.tokens.peek(required=True)
+        expr = recurse()
+        if not issubclass(expr.type, expected):
+            raise ParserException(f"invalid expression starting with: '{first.text()}'", first)
+
+        nodes = [expr]
+        while nodes:
+            node = nodes.pop()
+            if isinstance(node.lhs, (Value, Boolean)):
+                node.lhs = self.add_constant(node.lhs)
+            elif isinstance(node.lhs, Expression):
+                nodes.append(node.lhs)
+            if isinstance(node.rhs, (Value, Boolean)):
+                node.rhs = self.add_constant(node.rhs)
+            elif isinstance(node.rhs, Expression):
+                nodes.append(node.rhs)
+        return expr
 
     def _expr(self):
-        return self._parse_expr(TokenType.MATH.value, Value)
+        return self._parse_expr(Value)
 
     def _test_expr(self):
-        return self._parse_expr(TokenType.LOGICAL.value, Boolean)
+        return self._parse_expr(Boolean)
 
     def _parse_block(self, indent):
         token = self.tokens.pop(expected_type=TokenType.CONTROLFLOW)
@@ -415,8 +474,8 @@ class Parser:
             if not count:
                 self.add_line(indent + 1, "pass")
 
-        match token.text():
-            case "REP" | "REPI":
+        match token.bytes():
+            case b"REP" | b"REPI":
                 loop_var = "_"
                 local = self.get_new_local()
                 """
@@ -438,7 +497,7 @@ class Parser:
                 handle_block()
                 if variable is not None:
                     self.add_line(indent, Assignment(variable, local))
-            case "WHILE" | "WHILEI":
+            case b"WHILE" | b"WHILEI":
                 loop_var = "_"
                 """
                 For _ in count(0):
@@ -452,19 +511,19 @@ class Parser:
                 self.add_line(indent, For("count(0)", loop_var))
                 if variable is not None:
                     self.add_line(indent + 1, Assignment(variable, Command("Number", [loop_var])))
-                self.add_line(indent + 1, If(Expression(["not ", "(", args[0], ")"])))
+                self.add_line(indent + 1, If(f"not ({args[0]})"))
                 self.add_line(indent + 2, "break")
                 if len(args) > 1:
                     self.add_line(indent + 1, If(f"{loop_var} > 0"))
                     self.add_line(indent + 2, args[1])
                 handle_block()
-            case "IF":
+            case b"IF":
                 assert variable is None
                 self.add_line(indent, If(*args))
                 handle_block()
                 if self.tokens.has(type=TokenType.ELSE):
                     self.tokens.pop()
-                    self.add_line(indent, BlockBegin("else"))
+                    self.add_line(indent, "else:")
                     handle_block()
             case _:
                 assert False
@@ -495,6 +554,7 @@ class Parser:
             self.lines = []
             self.variables = {}
             self.constants = {}
+            self.rev_constants = {}
             self._parse_commands(0)
             if not self.tokens.empty():
                 token = self.tokens.peek()
@@ -517,7 +577,7 @@ class Parser:
             generated.append("# constants and variables")
             generated.append("#" * 80)
             for name, value in self.python_globals().items():
-                if isinstance(value, (VarType, Value)):
+                if isinstance(value, (VarType, Value, Boolean)):
                     generated.append(f"{name} = {repr(value)}")
             generated.append("")
 

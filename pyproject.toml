@@ -29,6 +29,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.version]
 source = "versioningit"
+write_to = "checktestdata/__version__.py"
 
 [tool.ruff.lint]
 extend-select = [

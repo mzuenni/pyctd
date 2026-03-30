@@ -3,7 +3,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from checktestdata import __version__
+from checktestdata.__version__ import __version__
 from checktestdata.lib import ValidationError
 from checktestdata.parser import parse, ParserException
 from checktestdata.tokenizer import tokenize
