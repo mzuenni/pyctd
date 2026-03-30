@@ -24,10 +24,10 @@ Inside a set definition:
     If `^` is escaped (e.g. `[\^]`) or if it is not the first character (e.g. `[a^]`) it will match a literal `'^'`.
     * `\` can be used to escape any special characters.
     However, most special characters do not need to be escaped.
-    Only `']'` must be escaped and `'^'` or `'-'` might need to be escaped depending on the position.
-    For example both `[\-]` and `[-]` will match a literal `'-'`.
+    Only `'['`, `']'`, `'^'` or `'-'` might need to be escaped depending on the position.
+    Opening and closing brackets (e.g. `'['`, `']'`) at the first position of a character set need no escaping.
+    For example both `[\[]` and `[[]` will match a literal `'['`.
     If `\` is not followed by any special characters it matches a literal `'\'`.
-    * It is an error if the character set does not specify any characters (e.g. `[]` or `[^]`).
 * `{m,n}`: causes the resulting regular expression to match from `m` to `n` repetitions of the preceding regular expression.
 Matching is done greedy, i.e., as many repetitions as possible are matched.
 Omitting *m* specifies a lower bound of zero, and omitting *n* specifies an infinite upper bound.
