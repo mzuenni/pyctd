@@ -447,12 +447,12 @@ class RegexParser:
                 self.checked.append(token)
             tmp = []
 
-        empty = True
+        if self._peek() is not None and self._peek() in b"[]":
+            tmp.append(self._pop())
         while self._peek() is not None and self._peek() != b"]":
             if self._peek() == b"[":
                 self._error("nested charset?")
             tmp.append(self._pop())
-            empty = False
 
             if len(tmp) >= 3 and tmp[-2] == b"-":
                 lhs = tmp[-3]
@@ -466,9 +466,6 @@ class RegexParser:
                 tmp = [rhs]
                 flush_tmp()
         flush_tmp()
-
-        if empty:
-            self._error("empty character set")
 
         self._consume(b"]")
 
