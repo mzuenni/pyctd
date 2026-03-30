@@ -493,10 +493,10 @@ class _Reader:
 
     def _advance(self, text):
         self.pos += len(text)
-        newline = text.find(0x0A)
-        if newline >= 0:
-            self.line += text.count(0x0A)
-            self.column = len(text) - newline
+        newlines = text.count(0x0A)
+        if newlines > 0:
+            self.line += newlines
+            self.column = len(text) - text.rfind(0x0A)
         else:
             self.column += len(text)
 
