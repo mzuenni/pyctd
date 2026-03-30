@@ -1,12 +1,9 @@
-import argparse
 import re
 import sys
-from abc import ABC
 from collections import Counter
 from enum import Enum
 from fractions import Fraction
 from functools import cache
-from pathlib import Path
 
 if hasattr(sys, "set_int_max_str_digits"):
     sys.set_int_max_str_digits(0)
@@ -142,10 +139,11 @@ class Boolean:
         raise TypeError(f"unsupported operand type(s) for !=: 'Boolean' and '{other.__class__.__name__}'")
 
 
-class Value(ABC):
+class Value:
     __slots__ = ("value",)
 
     def __init__(self, value):
+        assert self.__class__ != Value
         self.value = value
 
     def __repr__(self):
@@ -318,82 +316,6 @@ class VarType:
             self.value_count[value] += 1
 
 
-def assert_type(method, arg, t):
-    if not isinstance(arg, t):
-        raise TypeError(f"{method} cannot be invoked with {arg.__class__.__name__}")
-
-
-class FLOAT_OPTION(Enum):
-    ANY = 0
-    FIXED = 1
-    SCIENTIFIC = 2
-
-    def msg(self):
-        return "float" if self == FLOAT_OPTION.ANY else f"{self.name.lower()} float"
-
-
-class _Reader:
-    def __init__(self, raw):
-        self.raw = raw
-        self.pos = 0
-        self.line = 1
-        self.column = 1
-        self.space_tokenizer = re.compile(rb"[\s]|[^\s]*")
-
-    def _advance(self, text):
-        self.pos += len(text)
-        newline = text.find(0x0A)
-        if newline >= 0:
-            self.line += text.count(0x0A)
-            self.column = len(text) - newline
-        else:
-            self.column += len(text)
-
-    def peek_char(self):
-        return self.raw[self.pos : self.pos + 1]
-
-    def pop_char_unchecked(self):
-        self.column += 1
-        self.pos += 1
-
-    def peek_until_space(self):
-        return self.space_tokenizer.match(self.raw, self.pos).group()
-
-    def pop_string(self, expected):
-        if not self.raw.startswith(expected, self.pos):
-            got = self.raw[self.pos : self.pos + len(expected)]
-            mismatch = next((i for i, c in enumerate(zip(got, expected)) if c[0] != c[1]), min(len(got), len(expected)))
-            msg = f"got: {format_token(got)}, but expected {format_token(expected, False)}"
-            if expected == b"\n" and got == b"\r":
-                msg += ' (use explicit STRING("\\r\\n") for windows newlines)'
-            elif mismatch > 5:
-                msg += f" (mismatch after {mismatch} chars)"
-            token = InputToken(self.raw, self.line, self.column, len(got))
-            raise ValidationError(msg, token)
-        self._advance(expected)
-
-    def pop_regex(self, regex):
-        match = compile_regex(regex).match(self.raw, self.pos)
-        if not match:
-            got = self.peek_until_space()
-            msg = f"got: {format_token(got)}, but expected {format_token(regex, False)}"
-            token = InputToken(self.raw, self.line, self.column, len(got))
-            raise ValidationError(msg, token)
-        text = match.group()
-        self._advance(text)
-        return text
-
-    def pop_base_number(self, sign=b""):
-        start = self.pos
-        if self.pos < len(self.raw) and self.raw[self.pos] in sign:
-            self.pos += 1
-        while self.pos < len(self.raw) and 0x30 <= self.raw[self.pos] <= 0x39:
-            self.pos += 1
-        text = self.raw[start : self.pos]
-        self.column += len(text)
-        return text
-
-
 class RegexParserState(Enum):
     EMPTY = 1
     NONEMPTY = 2
@@ -547,6 +469,82 @@ def compile_regex(raw):
     return RegexParser(raw).compile()
 
 
+def assert_type(method, arg, t):
+    if not isinstance(arg, t):
+        raise TypeError(f"{method} cannot be invoked with {arg.__class__.__name__}")
+
+
+class FLOAT_OPTION(Enum):
+    ANY = 0
+    FIXED = 1
+    SCIENTIFIC = 2
+
+    def msg(self):
+        return "float" if self == FLOAT_OPTION.ANY else f"{self.name.lower()} float"
+
+
+class _Reader:
+    def __init__(self, raw):
+        self.raw = raw
+        self.pos = 0
+        self.line = 1
+        self.column = 1
+        self.space_tokenizer = re.compile(rb"[\s]|[^\s]*")
+
+    def _advance(self, text):
+        self.pos += len(text)
+        newline = text.find(0x0A)
+        if newline >= 0:
+            self.line += text.count(0x0A)
+            self.column = len(text) - newline
+        else:
+            self.column += len(text)
+
+    def peek_char(self):
+        return self.raw[self.pos : self.pos + 1]
+
+    def pop_char_unchecked(self):
+        self.column += 1
+        self.pos += 1
+
+    def peek_until_space(self):
+        return self.space_tokenizer.match(self.raw, self.pos).group()
+
+    def pop_string(self, expected):
+        if not self.raw.startswith(expected, self.pos):
+            got = self.raw[self.pos : self.pos + len(expected)]
+            mismatch = next((i for i, c in enumerate(zip(got, expected)) if c[0] != c[1]), min(len(got), len(expected)))
+            msg = f"got: {format_token(got)}, but expected {format_token(expected, False)}"
+            if expected == b"\n" and got == b"\r":
+                msg += ' (use explicit STRING("\\r\\n") for windows newlines)'
+            elif mismatch > 5:
+                msg += f" (mismatch after {mismatch} chars)"
+            token = InputToken(self.raw, self.line, self.column, len(got))
+            raise ValidationError(msg, token)
+        self._advance(expected)
+
+    def pop_regex(self, regex):
+        match = compile_regex(regex).match(self.raw, self.pos)
+        if not match:
+            got = self.peek_until_space()
+            msg = f"got: {format_token(got)}, but expected {format_token(regex, False)}"
+            token = InputToken(self.raw, self.line, self.column, len(got))
+            raise ValidationError(msg, token)
+        text = match.group()
+        self._advance(text)
+        return text
+
+    def pop_base_number(self, sign=b""):
+        start = self.pos
+        if self.pos < len(self.raw) and self.raw[self.pos] in sign:
+            self.pos += 1
+        while self.pos < len(self.raw) and 0x30 <= self.raw[self.pos] <= 0x39:
+            self.pos += 1
+        text = self.raw[start : self.pos]
+        self.column += len(text)
+        return text
+
+
 class Constraints:
     __slots__ = ("file", "entries")
 
@@ -580,8 +578,9 @@ class Constraints:
 
         for name, entries in self.entries.items():
             string = " ".join(map(to_string, entries))
-            lines.append(f"{name} {name} {string}")
-        self.file.write_text("\n".join(lines))
+            lines.append(f"{name} {name} {string}\n")
+        with open(self.file, "w") as f:
+            f.writelines(lines)
 
 
 reader = None
@@ -602,28 +601,20 @@ def init_lib():
         sys.excepthook = excepthook
 
     global reader, constraints
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--constraints_file",
-        default=None,
-        type=Path,
-        required=False,
-        help="The file to write constraints to file to use.",
-    )
-    parser.add_argument(
-        "testdata",
-        nargs="?",
-        default="-",
-        help="If given, the input file to check, or `-` for stdin",
-    )
-    args = parser.parse_args()
 
-    constraints = Constraints(args.constraints_file)
-
-    if args.testdata == "-":
-        raw = sys.stdin.buffer.read()
+    arg = 1
+    if arg < len(sys.argv) and sys.argv[arg] == "--constraints_file":
+        constraints = Constraints(sys.argv[arg + 1])
+        arg += 2
     else:
-        raw = Path(args.testdata).read_bytes()
+        constraints = Constraints(None)
+
+    if arg < len(sys.argv) and sys.argv[arg] != "-":
+        with open(sys.argv[arg], "rb") as f:
+            raw = f.read()
+        arg += 1
+    else:
+        raw = sys.stdin.buffer.read()
     reader = _Reader(raw)
 
 

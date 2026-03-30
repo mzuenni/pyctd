@@ -1,6 +1,5 @@
 import argparse
 import sys
-import traceback
 from pathlib import Path
 
 from checktestdata.__version__ import __version__
@@ -108,6 +107,8 @@ def main():
                 exec(compiled, python_globals)
             except Exception as e:
                 print(e, file=sys.stderr)
+                import traceback
+
                 for frame in traceback.extract_tb(e.__traceback__):
                     if frame.filename == file_name:
                         line = parser.guess_line(python_code, frame.lineno)
