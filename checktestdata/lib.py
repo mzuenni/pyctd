@@ -643,7 +643,7 @@ def ISEOF():
 def UNIQUE(arg, *args):
     assert type(arg) is VarType
     if not args:
-        return Boolean(arg.value_count[arg.data] == 0 and len(arg.entries) == arg.value_count.total())
+        return Boolean(arg.value_count[arg.data] == 0 and all(x <= 1 for x in arg.value_count.values()))
     for other in args:
         assert type(other) is VarType
         if (arg.data is None) != (other.data is None):
