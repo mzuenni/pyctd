@@ -35,15 +35,15 @@ def parse_string(token):
                 return b"\r"
             case b"b":
                 return b"\b"
-            case _ if len(text) <= 2 or text[0] in b"0123":
+            case _ if len(text) <= 2 or text[0:1] in b"0123":
                 return bytes((int(text, 8),))
             case _:
                 raise ParserException(f"Bad escape sequence '\\{text.decode()}'", token)
 
     text = ESCAPE_REGEX.sub(replace, token.bytes())
     assert len(text) >= 2
-    assert text[0] == ord('"')
-    assert text[-1] == ord('"')
+    assert text[:1] == b'"'
+    assert text[-1:] == b'"'
     return text[1:-1]
 
 
@@ -165,25 +165,60 @@ class Expression:
         return self.op is None and isinstance(self.lhs, type)
 
     def __neg__(self):
-        if not issubclass(self.type, Value):
+        if self.type != Value:
             raise TypeError(f"bad operand type for unary -: '{self.type.__name__}'")
         if self.is_value(Number):
             return Expression(Value, -self.lhs)
         return Expression(Value, None, "-", self)
 
     def __invert__(self):
-        if not issubclass(self.type, Boolean):
+        if self.type != Boolean:
             raise TypeError(f"bad operand type for unary !: '{self.type.__name__}'")
         if self.is_value(Boolean):
             return Expression(Boolean, ~self.lhs)
         return Expression(Boolean, None, "~", self)
 
     def binary_operator(lhs, op, rhs):
-        if lhs.type != rhs.type or not issubclass(lhs.type, op.in_type):
+        if lhs.type != rhs.type or lhs.type != op.in_type:
             raise TypeError(f"unsupported operand type(s) for {op.ctd}: '{lhs.type.__name__}' and '{rhs.type.__name__}'")
-        if lhs.is_value((Boolean, Number)) and rhs.is_value((Boolean, Number)):
+        if lhs.is_value(lhs.type) and rhs.is_value(type(lhs.lhs)) and (op.python != "/" or rhs.lhs.value != 0):
             return Expression(op.out_type, op.function(lhs.lhs, rhs.lhs))
-        # TODO: try some more constant folding
+        if op.python in "+-*":
+            # we intentionally avoid integer division
+            ops = "+-" if op.python in "+-" else "*"
+            if lhs.op is None or lhs.op in ops:
+                if rhs.op is None or rhs.op in ops:
+                    value = None
+                    variables = []
+
+                    def aggregate(x, sign):
+                        nonlocal value
+                        if isinstance(x, Number):
+                            if value is None:
+                                value = Number(0 if ops == "+-" else 1)
+                            if ops == "+-" and sign > 0:
+                                value += x
+                            if ops == "+-" and sign < 0:
+                                value -= x
+                            if ops == "*":
+                                value *= x
+                        elif x is not None:
+                            variables.append((x, sign))
+
+                    aggregate(lhs.lhs, 1)
+                    aggregate(lhs.rhs, -1 if lhs.op == "-" else 1)
+                    aggregate(rhs.lhs, -1 if op.python == "-" else 1)
+                    aggregate(rhs.rhs, -1 if (op.python == "-") != (rhs.op == "-") else 1)
+
+                    if value is not None:
+                        if not variables:
+                            return Expression(Value, value)
+                        ops = "?" + ops
+                        rhs, sign = variables[0]
+                        rhs = Expression(Value, rhs)
+                        for x, s in variables[1:]:
+                            rhs = Expression(Value, rhs, ops[sign * s], x)
+                        return Expression(Value, value, ops[sign], rhs)
         return Expression(op.out_type, lhs, op.python, rhs)
 
     def __str__(self):
@@ -443,7 +478,7 @@ class Parser:
 
         first = self.tokens.peek(required=True)
         expr = recurse()
-        if not issubclass(expr.type, expected):
+        if expr.type != expected:
             raise ParserException(f"invalid expression starting with: '{first.text()}'", first)
 
         nodes = [expr]

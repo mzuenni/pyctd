@@ -108,7 +108,7 @@ class Boolean:
             raise TypeError(f"cannot combine Boolean and {rhs.__class__.__name__}")
 
     def __init__(self, value):
-        assert isinstance(value, bool)
+        assert type(value) is bool
         self.value = value
 
     def __repr__(self):
@@ -195,7 +195,7 @@ class String(Value):
     __slots__ = ()
 
     def __init__(self, value):
-        assert isinstance(value, bytes)
+        assert type(value) is bytes
         super().__init__(value)
 
     def __str__(self):
@@ -211,12 +211,12 @@ class Number(Value):
             raise TypeError(f"cannot combine {lhs.__class__.__name__} and {rhs.__class__.__name__}")
 
     def __init__(self, value):
-        assert isinstance(value, (int, Fraction))
+        assert type(value) in (int, Fraction)
         super().__init__(value)
 
     def is_integer(self):
         # we check the type, not the value!
-        return isinstance(self.value, int)
+        return type(self.value) is int
 
     def __index__(self):
         if not self.is_integer():
@@ -308,7 +308,7 @@ class VarType:
         else:
             for key_part in key:
                 # Checktestdata seems to enforce integers here
-                if not isinstance(key_part, Number) or not key_part.is_integer():
+                if type(key_part) is not Number or not key_part.is_integer():
                     raise TypeError(f"key for {self.name} must be integer(s)")
             if key in self.entries:
                 self.value_count[self.entries[key]] -= 1
@@ -470,7 +470,7 @@ def compile_regex(raw):
 
 
 def assert_type(method, arg, t):
-    if not isinstance(arg, t):
+    if type(arg) is not t:
         raise TypeError(f"{method} cannot be invoked with {arg.__class__.__name__}")
 
 
@@ -493,10 +493,10 @@ class _Reader:
 
     def _advance(self, text):
         self.pos += len(text)
-        newlines = text.count(0x0A)
+        newlines = text.count(b"\n")
         if newlines > 0:
             self.line += newlines
-            self.column = len(text) - text.rfind(0x0A)
+            self.column = len(text) - text.rfind(b"\n")
         else:
             self.column += len(text)
 
@@ -633,7 +633,7 @@ def MATCH(arg):
     char = reader.peek_char()
     if not char:
         return Boolean(False)
-    return Boolean(char[0] in arg.value)
+    return Boolean(char in arg.value)
 
 
 def ISEOF():
@@ -641,9 +641,11 @@ def ISEOF():
 
 
 def UNIQUE(arg, *args):
-    assert isinstance(arg, VarType)
+    assert type(arg) is VarType
+    if not args:
+        return Boolean(arg.data not in arg.entries and len(arg.entries) == arg.value_count.total())
     for other in args:
-        assert isinstance(other, VarType)
+        assert type(other) is VarType
         if (arg.data is None) != (other.data is None):
             raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE")
         if arg.entries.keys() != other.entries.keys():
@@ -662,7 +664,7 @@ def UNIQUE(arg, *args):
 
 def INARRAY(value, array):
     assert isinstance(value, Value)
-    assert isinstance(array, VarType)
+    assert type(array) is VarType
     if array.data is not None and array.data == value:
         return Boolean(True)
     return Boolean(array.value_count[value] > 0)
@@ -694,7 +696,7 @@ def _starts_number(text):
     if first_digit >= len(text):
         # no digits
         return False
-    if first_digit + 1 < len(text) and text[first_digit] == 0x30:
+    if first_digit + 1 < len(text) and text.startswith(b"0", first_digit):
         # leading zero
         return False
     return True
@@ -722,7 +724,7 @@ def INT(min, max, constraint=None):
 
 
 def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
-    assert isinstance(option, FLOAT_OPTION)
+    assert type(option) is FLOAT_OPTION
     assert_type("FLOAT", min, Number)
     assert_type("FLOAT", max, Number)
     line, column = reader.line, reader.column
@@ -763,7 +765,7 @@ def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
 
 
 def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPTION.ANY):
-    assert isinstance(option, FLOAT_OPTION)
+    assert type(option) is FLOAT_OPTION
     assert_type("FLOATP", min, Number)
     assert_type("FLOATP", max, Number)
     assert_type("FLOATP", mindecimals, Number)
@@ -779,7 +781,7 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
             raw = reader.peek_char()
         token = InputToken(reader.raw, line, column, len(raw))
         raise ValidationError(f"expected a {option.msg()} but got {format_token(raw)}", token)
-    leading = raw[1:] if raw[0] == 0x2D else raw
+    leading = raw[1:] if raw[0:1] == b"-" else raw
     decimals = b""
     if reader.peek_char() == b".":
         reader.pop_char_unchecked()
