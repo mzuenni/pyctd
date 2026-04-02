@@ -190,5 +190,4 @@ def tokenize(raw):
 
             yield token
 
-    # print(*generator())
     return TokenStream(generator())

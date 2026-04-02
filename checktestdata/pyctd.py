@@ -8,7 +8,7 @@ from checktestdata.parser import parse, ParserException
 from checktestdata.tokenizer import tokenize
 
 
-def parse_args():
+def _parse_args():
     parser = argparse.ArgumentParser(description="Checktestdata tool written in Python.")
     parser.add_argument(
         "-v",
@@ -63,7 +63,7 @@ def parse_args():
     return args
 
 
-def standalone_args(config):
+def _standalone_args(config):
     args = [sys.argv[0]]
     if config.constraints_file is not None:
         args += ["--constraints_file", config.constraints_file]
@@ -73,7 +73,7 @@ def standalone_args(config):
 
 
 def main():
-    config = parse_args()
+    config = _parse_args()
 
     def debug(*args, **kwargs):
         if not config.debug:
@@ -103,7 +103,7 @@ def main():
             compiled = compile(python_code, file_name, "exec")
             try:
                 debug("Running compiled code")
-                sys.argv = standalone_args(config)
+                sys.argv = _standalone_args(config)
                 exec(compiled, python_globals)
             except Exception as e:
                 print(e, file=sys.stderr)
