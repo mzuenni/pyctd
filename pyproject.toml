@@ -33,6 +33,15 @@ source = "versioningit"
 [tool.versioningit.write]
 file = "checktestdata/__version__.py"
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "pyproject.toml",
+    "/checktestdata",
+    "/doc",
+    "LICENSE",
+    "README.md",
+]
+
 [tool.ruff.lint]
 extend-select = [
     "I", # Enable import sorting rules
