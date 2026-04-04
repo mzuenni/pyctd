@@ -619,6 +619,9 @@ def init_lib():
         raw = sys.stdin.buffer.read()
     _reader = _Reader(raw)
 
+    if arg != len(sys.argv):
+        raise RuntimeError("Invalid arguments")
+
 
 def finalize_lib():
     _constraints.write()
