@@ -605,7 +605,7 @@ def init_lib():
     global _reader, _constraints
 
     arg = 1
-    if arg < len(sys.argv) and sys.argv[arg] == "--_constraints_file":
+    if arg < len(sys.argv) and sys.argv[arg] == "--constraints_file":
         _constraints = _Constraints(sys.argv[arg + 1])
         arg += 2
     else:
