@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 from collections import Counter
@@ -596,7 +597,7 @@ def init_lib():
         def excepthook(exc_type, exc_value, exc_traceback):
             if exc_type == ValidationError:
                 print(exc_value, file=sys.stderr)
-                sys.exit(43)
+                os._exit(43)
             else:
                 sys.__excepthook__(exc_type, exc_value, exc_traceback)
 
@@ -627,7 +628,7 @@ def finalize_lib():
     _constraints.write()
     print("testdata ok!")
     if _standalone:
-        sys.exit(42)
+        os._exit(42)
 
 
 # Methods used by Checktestdata
