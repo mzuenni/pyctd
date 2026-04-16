@@ -561,10 +561,10 @@ class _Constraints:
         a, b, c, d, e, f = self.entries.get(name, (False, False, value, value, min_value, max_value))
         a |= value == min_value
         b |= value == max_value
-        c = min(e, value)
-        d = max(f, value)
-        e = min(c, min_value)
-        f = max(d, max_value)
+        c = min(c, value)
+        d = max(d, value)
+        e = min(e, min_value)
+        f = max(f, max_value)
         self.entries[name] = (a, b, c, d, e, f)
 
     def write(self):
