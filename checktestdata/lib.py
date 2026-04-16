@@ -558,13 +558,13 @@ class _Constraints:
     def log(self, name, value, min_value, max_value):
         if self.file is None or name is None:
             return
-        a, b, c, d, e, f = self.entries.get(name, (False, False, min_value, max_value, value, value))
+        a, b, c, d, e, f = self.entries.get(name, (False, False, value, value, min_value, max_value))
         a |= value == min_value
         b |= value == max_value
-        c = min(c, min_value)
-        d = max(d, max_value)
-        e = min(e, value)
-        f = max(f, value)
+        c = min(e, value)
+        d = max(f, value)
+        e = min(c, min_value)
+        f = max(d, max_value)
         self.entries[name] = (a, b, c, d, e, f)
 
     def write(self):
