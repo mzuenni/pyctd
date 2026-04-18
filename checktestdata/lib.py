@@ -653,9 +653,11 @@ def UNIQUE(arg, *args):
     for other in args:
         assert type(other) is VarType
         if (arg.data is None) != (other.data is None):
-            raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE")
+            token = _InputToken(_reader.raw, _reader.line, _reader.column, 0)
+            raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE", token)
         if arg.entries.keys() != other.entries.keys():
-            raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE")
+            token = _InputToken(_reader.raw, _reader.line, _reader.column, 0)
+            raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE", token)
 
     def make_entry(key):
         return (arg[key], *(other[key] for other in args))
@@ -836,7 +838,8 @@ def REGEX(arg):
 def ASSERT(arg):
     _assert_type("ASSERT", arg, Boolean)
     if not arg.value:
-        raise ValidationError("ASSERT failed!")
+        token = _InputToken(_reader.raw, _reader.line, _reader.column, 0)
+        raise ValidationError("ASSERT failed!", token)
 
 
 def UNSET(*args):
