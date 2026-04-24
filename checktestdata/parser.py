@@ -165,21 +165,21 @@ class Expression:
         return self.op is None and isinstance(self.lhs, type)
 
     def __neg__(self):
-        if self.type != Value:
+        if self.type is not Value:
             raise TypeError(f"bad operand type for unary -: '{self.type.__name__}'")
         if self.is_value(Number):
             return Expression(Value, -self.lhs)
         return Expression(Value, None, "-", self)
 
     def __invert__(self):
-        if self.type != Boolean:
+        if self.type is not Boolean:
             raise TypeError(f"bad operand type for unary !: '{self.type.__name__}'")
         if self.is_value(Boolean):
             return Expression(Boolean, ~self.lhs)
         return Expression(Boolean, None, "~", self)
 
     def binary_operator(lhs, op, rhs):
-        if lhs.type != rhs.type or lhs.type != op.in_type:
+        if lhs.type is not rhs.type or lhs.type is not op.in_type:
             raise TypeError(f"unsupported operand type(s) for {op.ctd}: '{lhs.type.__name__}' and '{rhs.type.__name__}'")
         if lhs.is_value(lhs.type) and rhs.is_value(type(lhs.lhs)) and (op.python != "/" or rhs.lhs.value != 0):
             return Expression(op.out_type, op.function(lhs.lhs, rhs.lhs))
@@ -457,12 +457,12 @@ class Parser:
                 case TokenType.MATH if token.bytes() == b"-":
                     self.tokens.pop()
                     lhs = -recurse(7)
-                case TokenType.NOT if expected == Boolean:
+                case TokenType.NOT if expected is Boolean:
                     self.tokens.pop()
                     lhs = ~recurse(3)
                 case TokenType.STRING | TokenType.INTEGER | TokenType.FLOAT | TokenType.VARNAME | TokenType.FUNCTION:
                     lhs = Expression(Value, self._value(as_constant=False))
-                case TokenType.TEST if expected == Boolean:
+                case TokenType.TEST if expected is Boolean:
                     lhs = Expression(Boolean, self._test())
                 case _:
                     raise ParserException(f"invalid token in expression: '{token.text()}'", token)

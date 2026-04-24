@@ -105,7 +105,7 @@ class Boolean:
 
     @staticmethod
     def _check_boolean_type(lhs, rhs):
-        if Boolean != rhs.__class__:
+        if Boolean is not rhs.__class__:
             raise TypeError(f"cannot combine Boolean and {rhs.__class__.__name__}")
 
     def __init__(self, value):
@@ -144,7 +144,7 @@ class Value:
     __slots__ = ("value",)
 
     def __init__(self, value):
-        assert self.__class__ != Value
+        assert self.__class__ is not Value
         self.value = value
 
     def __repr__(self):
@@ -161,7 +161,7 @@ class Value:
 
     @staticmethod
     def _check_compare_type(lhs, rhs):
-        if lhs.__class__ != rhs.__class__:
+        if lhs.__class__ is not rhs.__class__:
             raise TypeError(f"cannot compare {lhs.__class__.__name__} and {rhs.__class__.__name__}")
 
     def __hash__(self):
@@ -208,7 +208,7 @@ class Number(Value):
 
     @staticmethod
     def _check_combine_type(lhs, rhs):
-        if lhs.__class__ != rhs.__class__:
+        if lhs.__class__ is not rhs.__class__:
             raise TypeError(f"cannot combine {lhs.__class__.__name__} and {rhs.__class__.__name__}")
 
     def __init__(self, value):
@@ -595,7 +595,7 @@ def init_lib():
     if _standalone:
 
         def excepthook(exc_type, exc_value, exc_traceback):
-            if exc_type == ValidationError:
+            if exc_type is ValidationError:
                 print(exc_value, file=sys.stderr)
                 os._exit(43)
             else:
