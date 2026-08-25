@@ -1,0 +1,3 @@
+INT(0, 10, n) NEWLINE
+SET(b=2)
+ASSERT(n / 2.0 > 0)

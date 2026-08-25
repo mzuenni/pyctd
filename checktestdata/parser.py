@@ -266,7 +266,7 @@ class Parser:
             self.constants["const_false"] = Boolean(False)
             return "const_false"
         assert isinstance(value, Value)
-        key = (type(value), value.value)
+        key = (type(value.value), value.value)
         if key in self.rev_constants:
             name = self.rev_constants[key]
         else:
