@@ -648,7 +648,7 @@ def ISEOF():
 def UNIQUE(arg, *args):
     assert type(arg) is VarType
     if not args:
-        return Boolean(arg.value_count[arg.data] == 0 and all(x <= 1 for x in arg.value_count.values()))
+        return Boolean(arg.data not in arg.value_count and all(x == 1 for x in arg.value_count.values()))
     for other in args:
         assert type(other) is VarType
         if (arg.data is None) != (other.data is None):
@@ -674,7 +674,7 @@ def INARRAY(value, array):
     assert type(array) is VarType
     if array.data is not None and array.data == value:
         return Boolean.TRUE
-    return Boolean(array.value_count[value] > 0)
+    return Boolean(value in array.value_count)
 
 
 def STRLEN(arg):
