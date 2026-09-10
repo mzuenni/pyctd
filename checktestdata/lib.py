@@ -54,10 +54,10 @@ def _format_token(raw, handle_eof=True):
 
 
 class _InputToken:
-    def __init__(self, raw, line, column, length):
+    def __init__(self, raw, pos, length):
         self.raw = raw
-        self.line = line
-        self.column = column
+        self.line = 1 + raw.count(b"\n", 0, pos)
+        self.column = pos - raw.rfind(b"\n", 0, pos)
         self.length = length
 
     def format(self):
@@ -490,24 +490,12 @@ class _Reader:
     def __init__(self, raw):
         self.raw = raw
         self.pos = 0
-        self.line = 1
-        self.column = 1
         self.space_tokenizer = re.compile(rb"[\s]|[^\s]*")
-
-    def _advance(self, text):
-        self.pos += len(text)
-        newlines = text.count(b"\n")
-        if newlines > 0:
-            self.line += newlines
-            self.column = len(text) - text.rfind(b"\n")
-        else:
-            self.column += len(text)
 
     def peek_char(self):
         return self.raw[self.pos : self.pos + 1]
 
     def pop_char_unchecked(self):
-        self.column += 1
         self.pos += 1
 
     def peek_until_space(self):
@@ -522,19 +510,19 @@ class _Reader:
                 msg += ' (use explicit STRING("\\r\\n") for windows newlines)'
             elif mismatch > 5:
                 msg += f" (mismatch after {mismatch} chars)"
-            token = _InputToken(self.raw, self.line, self.column, len(got))
+            token = _InputToken(self.raw, self.pos, len(got))
             raise ValidationError(msg, token)
-        self._advance(expected)
+        self.pos += len(expected)
 
     def pop_regex(self, regex):
         match = _compile_regex(regex).match(self.raw, self.pos)
         if not match:
             got = self.peek_until_space()
             msg = f"got: {_format_token(got)}, but expected {_format_token(regex, False)}"
-            token = _InputToken(self.raw, self.line, self.column, len(got))
+            token = _InputToken(self.raw, self.pos, len(got))
             raise ValidationError(msg, token)
         text = match.group()
-        self._advance(text)
+        self.pos += len(text)
         return text
 
     def pop_base_number(self, sign=b""):
@@ -543,9 +531,7 @@ class _Reader:
             self.pos += 1
         while self.pos < len(self.raw) and 0x30 <= self.raw[self.pos] <= 0x39:
             self.pos += 1
-        text = self.raw[start : self.pos]
-        self.column += len(text)
-        return text
+        return self.raw[start : self.pos]
 
 
 class _Constraints:
@@ -653,10 +639,10 @@ def UNIQUE(arg, *args):
     for other in args:
         assert type(other) is VarType
         if (arg.data is None) != (other.data is None):
-            token = _InputToken(_reader.raw, _reader.line, _reader.column, 0)
+            token = _InputToken(_reader.raw, _reader.pos, 0)
             raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE", token)
         if arg.entries.keys() != other.entries.keys():
-            token = _InputToken(_reader.raw, _reader.line, _reader.column, 0)
+            token = _InputToken(_reader.raw, _reader.pos, 0)
             raise ValidationError(f"{arg.name} and {other.name} must have the same keys for UNIQUE", token)
 
     def make_entry(key):
@@ -695,7 +681,7 @@ def EOF():
     got = _reader.peek_char()
     if got:
         msg = f"got: {_format_token(got)}, but expected {_format_token(b'')}"
-        token = _InputToken(_reader.raw, _reader.line, _reader.column, 1)
+        token = _InputToken(_reader.raw, _reader.pos, 1)
         raise ValidationError(msg, token)
 
 
@@ -705,16 +691,16 @@ def INT(min, max, constraint=None):
     # checktestdata is strict with the parameter type
     if not min.is_integer() or not max.is_integer():
         raise TypeError("INT expected integer but got float")
-    line, column = _reader.line, _reader.column
+    pos = _reader.pos
     raw = _reader.pop_base_number(b"-")
     if not _starts_number(raw) or raw.startswith(b"-0"):
         if raw == b"":
             raw = _reader.peek_char()
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"expected an integer but got {_format_token(raw)}", token)
     value = int(raw)
     if not min.value <= value <= max.value:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"integer {raw.decode()} outside of range [{min.value}, {max.value}]", token)
     _constraints.log(constraint, value, min.value, max.value)
     return Number(value)
@@ -733,38 +719,38 @@ def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
     assert type(option) is FLOAT_OPTION
     _assert_type("FLOAT", min, Number)
     _assert_type("FLOAT", max, Number)
-    line, column = _reader.line, _reader.column
+    pos = _reader.pos
     raw = _reader.pop_base_number(b"-")
     if not _starts_number(raw):
         if raw == b"":
             raw = _reader.peek_char()
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     if _reader.peek_char() == b".":
         _reader.pop_char_unchecked()
         decimals = _reader.pop_base_number(b"")
         raw += b"." + decimals
         if not decimals:
-            token = _InputToken(_reader.raw, line, column, len(raw))
+            token = _InputToken(_reader.raw, pos, len(raw))
             raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     has_exp = _reader.peek_char() in b"eE"
     if not has_exp and option == FLOAT_OPTION.SCIENTIFIC:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     if has_exp and option != FLOAT_OPTION.FIXED:
         _reader.pop_char_unchecked()
         exponent = _reader.pop_base_number(b"+-")
         raw += b"e" + exponent
         if not _starts_number(exponent):
-            token = _InputToken(_reader.raw, line, column, len(raw))
+            token = _InputToken(_reader.raw, pos, len(raw))
             raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     text = raw.decode()
     value = Fraction(text)
     if not min.value <= value <= max.value:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
     if text.startswith("-") and value == 0:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"float {text} should have no sign", token)
     _constraints.log(constraint, value, min.value, max.value)
     return Number(value)
@@ -780,12 +766,12 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
         raise TypeError("FLOATP(mindecimals) must be a non-negative integer")
     if not maxdecimals.is_integer() or maxdecimals.value < 0:
         raise TypeError("FLOATP(maxdecimals) must be a non-negative integer")
-    line, column = _reader.line, _reader.column
+    pos = _reader.pos
     raw = _reader.pop_base_number(b"-")
     if not _starts_number(raw):
         if raw == b"":
             raw = _reader.peek_char()
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     leading = raw[1:] if raw[0:1] == b"-" else raw
     decimals = b""
@@ -794,32 +780,32 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
         decimals = _reader.pop_base_number(b"")
         raw += b"." + decimals
         if not decimals:
-            token = _InputToken(_reader.raw, line, column, len(raw))
+            token = _InputToken(_reader.raw, pos, len(raw))
             raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     has_exp = _reader.peek_char() in b"eE"
     if not has_exp and option == FLOAT_OPTION.SCIENTIFIC:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     if has_exp and option != FLOAT_OPTION.FIXED:
         _reader.pop_char_unchecked()
         exponent = _reader.pop_base_number(b"+-")
         raw += b"e" + exponent
         if not _starts_number(exponent):
-            token = _InputToken(_reader.raw, line, column, len(raw))
+            token = _InputToken(_reader.raw, pos, len(raw))
             raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     if not mindecimals.value <= len(decimals) <= maxdecimals.value:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"float decimals outside of range [{mindecimals.value}, {maxdecimals.value}]", token)
     if has_exp and (len(leading) != 1 or leading == b"0"):
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError("scientific float should have exactly one non-zero before the decimal dot", token)
     text = raw.decode()
     value = Fraction(text)
     if not min.value <= value <= max.value:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
     if text.startswith("-") and value == 0:
-        token = _InputToken(_reader.raw, line, column, len(raw))
+        token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"float {text} should have no sign", token)
     _constraints.log(constraint, value, min.value, max.value)
     return Number(value)
@@ -838,7 +824,7 @@ def REGEX(arg):
 def ASSERT(arg):
     _assert_type("ASSERT", arg, Boolean)
     if not arg.value:
-        token = _InputToken(_reader.raw, _reader.line, _reader.column, 0)
+        token = _InputToken(_reader.raw, _reader.pos, 0)
         raise ValidationError("ASSERT failed!", token)
 
 
