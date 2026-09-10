@@ -1,7 +1,6 @@
 import os
 import re
 import sys
-from collections import Counter
 from enum import Enum
 from fractions import Fraction
 from functools import cache
@@ -108,15 +107,21 @@ class Boolean:
         if Boolean is not rhs.__class__:
             raise TypeError(f"cannot combine Boolean and {rhs.__class__.__name__}")
 
-    def __init__(self, value):
+    @staticmethod
+    def _new(value):
+        ret = object.__new__(Boolean)
+        ret.value = value
+        return ret
+
+    def __new__(cls, value):
         assert type(value) is bool
-        self.value = value
+        return cls.TRUE if value else cls.FALSE
 
     def __repr__(self):
-        return f"Boolean({repr(self.value)})"
+        return f"Boolean.{str(self.value).upper()}"
 
     def __str__(self):
-        return f"Boolean({self.value})"
+        return f"Boolean.{str(self.value).upper()}"
 
     def __bool__(self):
         return self.value
@@ -138,6 +143,10 @@ class Boolean:
     def __ne__(self, other):
         Value._check_compare_type(self, other)
         raise TypeError(f"unsupported operand type(s) for !=: 'Boolean' and '{other.__class__.__name__}'")
+
+
+Boolean.TRUE = Boolean._new(True)
+Boolean.FALSE = Boolean._new(False)
 
 
 class Value:
@@ -212,7 +221,7 @@ class Number(Value):
             raise TypeError(f"cannot combine {lhs.__class__.__name__} and {rhs.__class__.__name__}")
 
     def __init__(self, value):
-        assert type(value) in (int, Fraction)
+        assert type(value) is int or type(value) is Fraction
         super().__init__(value)
 
     def is_integer(self):
@@ -282,7 +291,7 @@ class VarType:
         # (we keep them separated since this is more efficient)
         self.data = None
         self.entries = {}
-        self.value_count = Counter()
+        self.value_count = {}
 
     def __repr__(self):
         return f"VarType({repr(self.name)})"
@@ -290,7 +299,7 @@ class VarType:
     def reset(self):
         self.data = None
         self.entries = {}
-        self.value_count = Counter()
+        self.value_count = {}
 
     def __getitem__(self, key):
         if key is None:
@@ -311,10 +320,14 @@ class VarType:
                 # Checktestdata seems to enforce integers here
                 if type(key_part) is not Number or not key_part.is_integer():
                     raise TypeError(f"key for {self.name} must be integer(s)")
-            if key in self.entries:
-                self.value_count[self.entries[key]] -= 1
+            old_value = self.entries.get(key, None)
+            if old_value is not None:
+                if self.value_count[old_value] == 1:
+                    self.value_count.pop(old_value)
+                else:
+                    self.value_count[old_value] -= 1
             self.entries[key] = value
-            self.value_count[value] += 1
+            self.value_count[value] = self.value_count.get(value, 0) + 1
 
 
 class _RegexParserState(Enum):
@@ -624,7 +637,7 @@ def MATCH(arg):
     _assert_type("MATCH", arg, String)
     char = _reader.peek_char()
     if not char:
-        return Boolean(False)
+        return Boolean.FALSE
     return Boolean(char in arg.value)
 
 
@@ -660,7 +673,7 @@ def INARRAY(value, array):
     assert isinstance(value, Value)
     assert type(array) is VarType
     if array.data is not None and array.data == value:
-        return Boolean(True)
+        return Boolean.TRUE
     return Boolean(array.value_count[value] > 0)
 
 
