@@ -1,0 +1,4 @@
+INT(-10, 10, int) SPACE FLOAT(-10, 10, float) NEWLINE
+ASSERT(int == float)
+ASSERT(1 == 1.0)
+EOF
