@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v3
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       # Make sure that `git describe` (used by Hatch to dynamically generate the version) knows the Git history, but no data about trees/blobs is needed.
