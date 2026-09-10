@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+from decimal import Decimal
 from enum import Enum
 from fractions import Fraction
 from functools import cache
@@ -758,7 +759,7 @@ def FLOAT(min, max, constraint=None, option=FLOAT_OPTION.ANY):
             token = _InputToken(_reader.raw, pos, len(raw))
             raise ValidationError(f"expected a {option.msg()} but got {_format_token(raw)}", token)
     text = raw.decode()
-    value = Fraction(text)
+    value = Fraction(Decimal(text))
     if not min.value <= value <= max.value:
         token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
@@ -813,7 +814,7 @@ def FLOATP(min, max, mindecimals, maxdecimals, constraint=None, option=FLOAT_OPT
         token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError("scientific float should have exactly one non-zero before the decimal dot", token)
     text = raw.decode()
-    value = Fraction(text)
+    value = Fraction(Decimal(text))
     if not min.value <= value <= max.value:
         token = _InputToken(_reader.raw, pos, len(raw))
         raise ValidationError(f"float {text} outside of range [{min.value}, {max.value}]", token)
