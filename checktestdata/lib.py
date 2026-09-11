@@ -595,7 +595,7 @@ def init_lib():
     if _standalone:
 
         def excepthook(exc_type, exc_value, exc_traceback):
-            if exc_type is ValidationError:
+            if exc_type in (ValidationError, TypeError):
                 print(exc_value, file=sys.stderr)
                 os._exit(43)
             else:
