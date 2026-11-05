@@ -308,9 +308,10 @@ class VarType:
                 raise TypeError(f"{self.name} is not assigned")
             return self.data
         else:
-            if key not in self.entries:
+            data = self.entries.get(key)
+            if data is None:
                 raise TypeError(f"missing key in {self.name}")
-            return self.entries[key]
+            return data
 
     def __setitem__(self, key, value):
         assert isinstance(value, Value), self.name
