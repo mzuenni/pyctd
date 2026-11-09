@@ -1,6 +1,9 @@
 name: CI
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   linux:
     strategy:
@@ -9,8 +12,10 @@ jobs:
         python: ['3.10', 'pypy3.10']
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       # Make sure that `git describe` (used by Hatch to dynamically generate the version) knows the Git history, but no data about trees/blobs is needed.
