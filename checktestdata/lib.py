@@ -1,3 +1,4 @@
+import gc
 import os
 import re
 import sys
@@ -5,6 +6,8 @@ from decimal import Decimal
 from enum import Enum
 from fractions import Fraction
 from functools import cache
+
+gc.disable()
 
 if hasattr(sys, "set_int_max_str_digits"):
     sys.set_int_max_str_digits(0)
